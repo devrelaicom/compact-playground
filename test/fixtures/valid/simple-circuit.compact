@@ -1,0 +1,7 @@
+pragma language_version >= 0.16 && <= 0.18;
+
+import CompactStandardLibrary;
+
+export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+  return (a + b) as Uint<64>;
+}

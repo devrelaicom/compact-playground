@@ -1,0 +1,12 @@
+pragma language_version >= 0.16 && <= 0.18;
+
+import CompactStandardLibrary;
+
+// This is wrong - old block syntax is deprecated
+ledger {
+  counter: Counter;
+}
+
+export circuit increment(): [] {
+  counter.increment(1);
+}

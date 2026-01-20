@@ -1,0 +1,70 @@
+import { spawn } from "child_process";
+
+/**
+ * Checks if the Compact compiler is installed and accessible
+ */
+export async function isCompilerInstalled(): Promise<boolean> {
+  try {
+    const version = await getCompilerVersion();
+    return version !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Gets the version of the installed Compact compiler
+ */
+export async function getCompilerVersion(): Promise<string | null> {
+  return new Promise((resolve) => {
+    // Use compactc directly (the actual compiler binary)
+    const compilerPath = process.env.COMPACT_PATH || "compactc";
+
+    const proc = spawn(compilerPath, ["--version"], {
+      timeout: 5000,
+    });
+
+    let stdout = "";
+
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0 && stdout) {
+        // Extract version number from output
+        // Expected format: "0.26.0" or similar
+        const versionMatch = stdout.match(/(\d+\.\d+\.\d+)/);
+        resolve(versionMatch ? versionMatch[1] : stdout.trim());
+      } else {
+        resolve(null);
+      }
+    });
+
+    proc.on("error", () => {
+      resolve(null);
+    });
+  });
+}
+
+/**
+ * Validates that a string is safe for use in a filename
+ */
+export function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
+}
+
+/**
+ * Creates a delay/sleep promise
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Truncates a string with ellipsis if too long
+ */
+export function truncate(str: string, maxLength: number): string {
+  if (str.length <= maxLength) return str;
+  return str.slice(0, maxLength - 3) + "...";
+}

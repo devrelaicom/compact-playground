@@ -1,0 +1,10 @@
+pragma language_version >= 0.16 && <= 0.18;
+
+import CompactStandardLibrary;
+
+export ledger counter: Counter;
+
+// Wrong - Void doesn't exist, should be []
+export circuit increment(): Void {
+  counter.increment(1);
+}
