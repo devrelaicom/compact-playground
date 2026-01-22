@@ -33,8 +33,8 @@ WORKDIR /app
 ENV HOME="/root"
 RUN mkdir -p /root/.compact/bin
 
-# Download Compact CLI tool (compact-v0.3.0)
-RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compact-v0.3.0/compact-x86_64-unknown-linux-musl.tar.xz \
+# Download Compact CLI tool (compact-v0.4.0)
+RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compact-v0.4.0/compact-x86_64-unknown-linux-musl.tar.xz \
        -o /tmp/compact.tar.xz \
     && mkdir -p /tmp/compact-extract \
     && tar -xJf /tmp/compact.tar.xz -C /tmp/compact-extract \

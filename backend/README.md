@@ -9,12 +9,23 @@ The playground runs the real Compact compiler (`compactc`) inside a Docker conta
 3. Output/errors are parsed and returned as JSON
 4. Temp files are cleaned up
 
+## Compact Repositories
+
+There are two relevant GitHub repositories:
+
+| Repository | Purpose |
+|------------|---------|
+| [LFDT-Minokawa/compact](https://github.com/LFDT-Minokawa/compact) | Source code (Scheme-based compiler) |
+| [midnightntwrk/compact](https://github.com/midnightntwrk/compact) | Pre-built binaries (releases) |
+
+The source code is written in Scheme and compiles to native binaries. For the playground, we use the pre-built binaries from `midnightntwrk/compact`.
+
 ## Compiler Setup
 
 The Dockerfile downloads two separate releases from [midnightntwrk/compact](https://github.com/midnightntwrk/compact):
 
 ### 1. Compact CLI (`compact`)
-- Release: `compact-v0.3.0`
+- Release: `compact-v0.4.0`
 - File: `compact-x86_64-unknown-linux-musl.tar.xz`
 - Purpose: Toolchain manager (not used at runtime, but included)
 
