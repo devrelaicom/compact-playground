@@ -2,7 +2,7 @@
 
 Compile Compact smart contracts in the browser. Built for [Learn Compact](https://github.com/Olanetsoft/learn-compact). 
 
-This project is built on the Midnight Network.
+This project integrates with the Midnight Network.
 
 **Live API:** https://compact-playground.onrender.com
 
