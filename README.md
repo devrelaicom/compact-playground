@@ -1,8 +1,21 @@
 # Compact Playground
 
-Compile, format, analyze, and diff [Compact](https://docs.midnight.network/) smart contracts via API. Built for [Learn Compact](https://github.com/Olanetsoft/learn-compact) and the Midnight Network.
+![Compact Playground Banner](assets/banner.png)
+
+Compile, format, analyze, and diff [Compact](https://docs.midnight.network/) smart contracts through a simple REST API. Built for [Learn Compact](https://github.com/Olanetsoft/learn-compact) and the [Midnight Network](https://midnight.network/) ecosystem.
 
 **Live API:** https://compact-playground.onrender.com
+
+## Features
+
+- **Compile** contracts with automatic pragma/import wrapping for code snippets
+- **Format** code using the official Compact formatter
+- **Analyze** contract structure — extract circuits, ledger fields, imports, and pragma
+- **Diff** two contract versions to detect structural changes
+- **Multi-version** compilation — test against multiple compiler versions in one request
+- **Version detection** — auto-select the right compiler from `pragma` constraints
+- **LRU caching** and per-IP **rate limiting** out of the box
+- **mdBook integration** — add Run buttons to Compact code blocks
 
 ## Quick Start
 
@@ -10,64 +23,92 @@ Compile, format, analyze, and diff [Compact](https://docs.midnight.network/) sma
 docker run -p 8080:8080 ghcr.io/olanetsoft/compact-playground
 ```
 
-Or with Docker Compose:
+Or build from source:
 
 ```bash
 docker compose up
+```
+
+Test it:
+
+```bash
+curl http://localhost:8080/compile \
+  -H "Content-Type: application/json" \
+  -d '{"code": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> { return (a + b) as Uint<64>; }"}'
 ```
 
 ## API Reference
 
 ### POST /compile
 
-Compile Compact code. Automatically wraps snippets with pragma and imports.
+Compile Compact code. Snippets without a `pragma` are automatically wrapped with the correct pragma and `import CompactStandardLibrary`.
 
 ```bash
-curl -X POST http://localhost:8080/compile \
+# Simple — uses default compiler
+curl http://localhost:8080/compile \
   -H "Content-Type: application/json" \
   -d '{"code": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> { return (a + b) as Uint<64>; }"}'
+
+# Detect compiler from pragma
+curl http://localhost:8080/compile \
+  -H "Content-Type: application/json" \
+  -d '{"code": "pragma language_version >= 0.21;\nimport CompactStandardLibrary;\nexport ledger counter: Counter;", "versions": ["detect"]}'
+
+# Multi-version matrix
+curl http://localhost:8080/compile \
+  -H "Content-Type: application/json" \
+  -d '{"code": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> { return (a + b) as Uint<64>; }", "versions": ["latest", "0.26.0", "0.24.0"]}'
 ```
 
-**Request body:**
-```json
-{
-  "code": "string (required)",
-  "options": {
-    "wrapWithDefaults": true,
-    "skipZk": true,
-    "version": "0.26.0"
-  }
-}
-```
+**Request:**
 
-**Response:**
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `code` | string | *required* | Compact source code |
+| `versions` | string[] | — | Compiler versions to use. Special values: `"latest"`, `"detect"`. Omit for single compilation with default version. |
+| `options.wrapWithDefaults` | boolean | `true` | Auto-wrap snippets with pragma and imports |
+| `options.skipZk` | boolean | `true` | Skip ZK proof generation (faster, syntax-only) |
+| `options.version` | string | — | Single compiler version (alternative to `versions` array) |
+
+**Response (single version):**
 ```json
 {
   "success": true,
   "output": "Compilation successful",
-  "executionTime": 3360
+  "executionTime": 3360,
+  "originalCode": "export circuit add...",
+  "wrappedCode": "pragma language_version >= 0.21;\nimport CompactStandardLibrary;\n..."
+}
+```
+
+**Response (multi-version via `versions`):**
+```json
+{
+  "success": true,
+  "results": [
+    {"version": "0.29.0", "requestedVersion": "latest", "success": true, "output": "Compilation successful", "executionTime": 3100},
+    {"version": "0.26.0", "requestedVersion": "0.26.0", "success": false, "errors": [{"message": "language version 0.18.0 mismatch", "severity": "error"}]}
+  ]
 }
 ```
 
 ### POST /format
 
-Format Compact code using `compact format`.
+Format Compact code. Returns the formatted output, whether anything changed, and a line-by-line diff when changes are detected.
 
 ```bash
-curl -X POST http://localhost:8080/format \
+curl http://localhost:8080/format \
   -H "Content-Type: application/json" \
   -d '{"code": "export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}"}'
 ```
 
-**Request body:**
-```json
-{
-  "code": "string (required)",
-  "options": {
-    "diff": false
-  }
-}
-```
+**Request:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `code` | string | *required* | Compact source code |
+| `versions` | string[] | — | Compiler versions (for multi-version formatting) |
+| `options.version` | string | — | Single compiler version |
 
 **Response:**
 ```json
@@ -75,21 +116,38 @@ curl -X POST http://localhost:8080/format \
   "success": true,
   "formatted": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {\n  return (a + b) as Uint<64>;\n}\n",
   "changed": true,
-  "diff": "- export circuit add(a:Uint<64>...)  \n+ export circuit add(a: Uint<64>...)"
+  "diff": "- export circuit add(a:Uint<64>...)\n+ export circuit add(a: Uint<64>...)"
 }
 ```
 
 ### POST /analyze
 
-Analyze contract structure. Two modes: `fast` (source-level parsing) and `deep` (compile + analyze).
+Analyze contract structure. Two modes:
+
+- **`fast`** — source-level parsing only (no compilation needed, version-independent)
+- **`deep`** — compiles the code first, then returns structure + compilation results
 
 ```bash
-curl -X POST http://localhost:8080/analyze \
+# Fast mode — extract structure without compilation
+curl http://localhost:8080/analyze \
   -H "Content-Type: application/json" \
-  -d '{"code": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> { return (a + b) as Uint<64>; }", "mode": "fast"}'
+  -d '{"code": "export ledger counter: Counter;\nexport circuit increment(): [] { counter.increment(1); }", "mode": "fast"}'
+
+# Deep mode with version detection
+curl http://localhost:8080/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"code": "pragma language_version >= 0.21;\nimport CompactStandardLibrary;\nexport ledger counter: Counter;", "mode": "deep", "versions": ["detect"]}'
 ```
 
-**Response:**
+**Request:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `code` | string | *required* | Compact source code |
+| `mode` | string | `"fast"` | `"fast"` or `"deep"` |
+| `versions` | string[] | — | Compiler versions (deep mode only) |
+
+**Response (fast):**
 ```json
 {
   "success": true,
@@ -98,27 +156,26 @@ curl -X POST http://localhost:8080/analyze \
   "imports": [],
   "circuits": [
     {
-      "name": "add",
+      "name": "increment",
       "exported": true,
       "pure": false,
-      "params": [
-        {"name": "a", "type": "Uint<64>"},
-        {"name": "b", "type": "Uint<64>"}
-      ],
-      "returnType": "Uint<64>",
-      "line": 1
+      "params": [],
+      "returnType": "[]",
+      "line": 2
     }
   ],
-  "ledger": []
+  "ledger": [
+    {"name": "counter", "type": "Counter", "exported": true}
+  ]
 }
 ```
 
 ### POST /diff
 
-Semantic diff between two contract versions. Detects added/removed/modified circuits, ledger fields, imports, and pragma changes.
+Semantic diff between two contract versions. Detects added, removed, and modified circuits, ledger fields, imports, and pragma changes.
 
 ```bash
-curl -X POST http://localhost:8080/diff \
+curl http://localhost:8080/diff \
   -H "Content-Type: application/json" \
   -d '{
     "before": "export circuit add(a: Uint<64>): Uint<64> { return a; }",
@@ -142,30 +199,9 @@ curl -X POST http://localhost:8080/diff \
 }
 ```
 
-### POST /matrix
-
-Compile a contract against multiple compiler versions and return a pass/fail matrix.
-
-```bash
-curl -X POST http://localhost:8080/matrix \
-  -H "Content-Type: application/json" \
-  -d '{"code": "export circuit test(): [] {}", "versions": ["0.25.0", "0.26.0"]}'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "matrix": [
-    {"version": "0.25.0", "success": true, "executionTime": 3200},
-    {"version": "0.26.0", "success": true, "executionTime": 3100}
-  ]
-}
-```
-
 ### GET /versions
 
-List installed compiler versions and the default.
+List installed compiler versions with language version mapping.
 
 ```bash
 curl http://localhost:8080/versions
@@ -174,8 +210,16 @@ curl http://localhost:8080/versions
 **Response:**
 ```json
 {
-  "default": "latest",
-  "installed": ["0.26.0"]
+  "default": "0.29.0",
+  "installed": [
+    {"version": "0.29.0", "languageVersion": "0.21.0"},
+    {"version": "0.28.0", "languageVersion": "0.20.0"},
+    {"version": "0.26.0", "languageVersion": "0.18.0"},
+    {"version": "0.25.0", "languageVersion": "0.17.0"},
+    {"version": "0.24.0", "languageVersion": "0.16.0"},
+    {"version": "0.23.0", "languageVersion": "0.15.0"},
+    {"version": "0.22.0", "languageVersion": "0.14.0"}
+  ]
 }
 ```
 
@@ -191,19 +235,33 @@ curl http://localhost:8080/health
 ```json
 {
   "status": "healthy",
-  "compiler": {"installed": true, "version": "0.26.0"},
+  "compactCli": {"installed": true, "version": "0.4.0"},
   "timestamp": "2026-03-09T14:00:00.000Z"
 }
 ```
 
+## Version Resolution
+
+Every endpoint that accepts a `versions` array supports three resolution strategies:
+
+| Value | Behavior |
+|-------|----------|
+| `"latest"` | Resolves to the newest installed compiler |
+| `"detect"` | Parses `pragma language_version` constraints from the source code and finds the best matching compiler |
+| `"0.26.0"` | Uses the exact compiler version specified |
+
+When no version is specified, the server uses the configured default (see `DEFAULT_COMPILER_VERSION`).
+
 ## Configuration
+
+All settings are controlled via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8080` | Server port |
-| `DEFAULT_COMPILER_VERSION` | `latest` | Default compiler version. Set to a specific version (e.g. `0.26.0`) for Learn Compact compatibility. |
-| `TEMP_DIR` | `/tmp/compact-playground` | Temporary directory for compilation |
-| `COMPACT_CLI_PATH` | `compact` | Path to the compact CLI |
+| `DEFAULT_COMPILER_VERSION` | `latest` | Default compiler. Use `latest`, or pin to a specific version (e.g. `0.26.0`) |
+| `TEMP_DIR` | `/tmp/compact-playground` | Temporary directory for compilations |
+| `COMPACT_CLI_PATH` | `compact` | Path to the Compact CLI binary |
 | `COMPILE_TIMEOUT` | `30000` | Compilation timeout in ms |
 | `RATE_LIMIT` | `20` | Max requests per window per IP |
 | `RATE_WINDOW` | `60000` | Rate limit window in ms |
@@ -211,7 +269,7 @@ curl http://localhost:8080/health
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries |
 | `CACHE_TTL` | `3600000` | Cache TTL in ms (1 hour) |
 
-> **Learn Compact note:** Set `DEFAULT_COMPILER_VERSION=0.26.0` to pin the compiler version to match `pragma language_version >= 0.16 && <= 0.18`.
+> **Learn Compact:** Set `DEFAULT_COMPILER_VERSION=0.26.0` to pin the compiler to match `pragma language_version >= 0.16 && <= 0.18` used in the tutorial contracts.
 
 ## Deployment
 
@@ -222,19 +280,25 @@ docker build -t compact-playground .
 docker run -p 8080:8080 compact-playground
 ```
 
+Pin a specific default compiler:
+
+```bash
+docker build --build-arg DEFAULT_COMPILER=0.26.0 -t compact-playground .
+```
+
 ### Docker Compose
 
 ```bash
 docker compose up
 ```
 
-Configure via `.env` (see `.env.example`).
+Configure via `.env` file (see `.env.example`).
 
 ### Railway
 
 1. Fork this repo
 2. Create a new project on [Railway](https://railway.app)
-3. Connect the repo — Railway auto-detects the `railway.toml` config
+3. Connect the repo — Railway auto-detects `railway.toml`
 4. Deploy
 
 ### Fly.io
@@ -244,7 +308,7 @@ fly launch --copy-config
 fly deploy
 ```
 
-### Render.com
+### Render
 
 1. Fork this repo
 2. Create Web Service on [render.com](https://render.com)
@@ -253,32 +317,73 @@ fly deploy
 
 ## mdBook Integration
 
-1. Copy `frontend/compact-playground.js` and `frontend/compact-playground.css` to your mdBook
+Add interactive Run buttons to Compact code blocks in [mdBook](https://rust-lang.github.io/mdBook/).
+
+1. Copy `frontend/compact-playground.js` and `frontend/compact-playground.css` into your book
 
 2. Add to `book.toml`:
-```toml
-[output.html]
-additional-js = ["compact-playground.js"]
-additional-css = ["compact-playground.css"]
-```
+   ```toml
+   [output.html]
+   additional-js = ["compact-playground.js"]
+   additional-css = ["compact-playground.css"]
+   ```
 
-3. Use `compact` language in code blocks:
-````markdown
-```compact
-export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
-    return (a + b) as Uint<64>;
-}
-```
-````
+3. Write Compact code blocks:
+   ````markdown
+   ```compact
+   export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+       return (a + b) as Uint<64>;
+   }
+   ```
+   ````
 
-Code blocks get a Run button. Press `Ctrl+Enter` to compile.
+Each block gets a **Run** button. Press **Ctrl+Enter** to compile. Results appear inline below the code.
+
+To point at your own instance, set `window.COMPACT_PLAYGROUND_API_URL` before the script loads or use a `data-api-url` attribute on the script tag.
 
 ## Development
 
+**Prerequisites:** Node.js 18+ and the [Compact toolchain](https://docs.midnight.network/) installed locally.
+
 ```bash
 npm install
-npm run dev:node  # Watch mode (requires compact toolchain locally)
-npm run test:run  # Run tests
+npm run dev:node    # Start dev server with watch mode
+npm run build       # Compile TypeScript
+npm run test:run    # Run test suite
+npm test            # Run tests in watch mode
+```
+
+### Project Structure
+
+```
+backend/src/
+  index.ts            Server entry point (Hono)
+  compiler.ts         Compilation engine
+  formatter.ts        Code formatting
+  analyzer.ts         Contract structure extraction
+  differ.ts           Semantic diffing
+  parser.ts           Compiler error parsing
+  wrapper.ts          Automatic pragma/import wrapping
+  version-manager.ts  Multi-version orchestration
+  cache.ts            LRU compilation cache
+  rate-limit.ts       Per-IP rate limiting
+  config.ts           Environment config
+  routes/             HTTP route handlers
+frontend/
+  compact-playground.js   mdBook integration script
+  compact-playground.css  mdBook styles
+demo/
+  demo.sh             Interactive API walkthrough
+  contracts/          Example Compact contracts
+```
+
+### Running the Demo
+
+The demo script builds a Docker image, starts the server, and walks through every endpoint interactively:
+
+```bash
+cd demo
+./demo.sh
 ```
 
 ## License
