@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { getConfig } from "./config.js";
 
 /**
  * Checks if the Compact compiler is installed and accessible
@@ -17,8 +18,7 @@ export async function isCompilerInstalled(): Promise<boolean> {
  */
 export async function getCompilerVersion(): Promise<string | null> {
   return new Promise((resolve) => {
-    // Use compactc directly (the actual compiler binary)
-    const compilerPath = process.env.COMPACT_PATH || "compactc";
+    const compilerPath = getConfig().compilerPath;
 
     const proc = spawn(compilerPath, ["--version"], {
       timeout: 5000,

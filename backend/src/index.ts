@@ -3,7 +3,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { compile } from "./compiler.js";
+import { formatCode } from "./formatter.js";
 import { getCompilerVersion, isCompilerInstalled } from "./utils.js";
+import { getConfig } from "./config.js";
 
 const app = new Hono();
 
@@ -20,19 +22,18 @@ app.use(
 
 // Rate limiting state (simple in-memory implementation)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 20; // requests per minute
-const RATE_WINDOW = 60 * 1000; // 1 minute in ms
 
 function checkRateLimit(ip: string): boolean {
+  const config = getConfig();
   const now = Date.now();
   const record = rateLimitMap.get(ip);
 
   if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_WINDOW });
+    rateLimitMap.set(ip, { count: 1, resetTime: now + config.rateWindow });
     return true;
   }
 
-  if (record.count >= RATE_LIMIT) {
+  if (record.count >= config.rateLimit) {
     return false;
   }
 
@@ -127,6 +128,36 @@ app.post("/compile", async (c) => {
   }
 });
 
+// Format endpoint
+app.post("/format", async (c) => {
+  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
+  if (!checkRateLimit(ip)) {
+    return c.json({ success: false, error: "Rate limit exceeded" }, 429);
+  }
+
+  try {
+    const body = await c.req.json();
+    const { code, options = {} } = body;
+
+    if (!code || typeof code !== "string") {
+      return c.json({ success: false, error: "Code is required and must be a string" }, 400);
+    }
+
+    if (code.length > 100 * 1024) {
+      return c.json({ success: false, error: "Code must be less than 100KB" }, 400);
+    }
+
+    const result = await formatCode(code, options);
+    return c.json(result);
+  } catch (error) {
+    console.error("Format error:", error);
+    return c.json(
+      { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" },
+      500
+    );
+  }
+});
+
 // Root endpoint
 app.get("/", (c) => {
   return c.json({
@@ -143,7 +174,7 @@ app.get("/", (c) => {
 });
 
 // Start server
-const port = parseInt(process.env.PORT || "8080", 10);
+const port = getConfig().port;
 
 console.log(`
 ╔═══════════════════════════════════════════════════╗

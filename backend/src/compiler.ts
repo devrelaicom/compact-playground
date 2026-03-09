@@ -4,6 +4,7 @@ import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { wrapWithDefaults, hasPragma } from "./wrapper.js";
 import { parseCompilerErrors, CompilerError } from "./parser.js";
+import { getConfig } from "./config.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -23,9 +24,6 @@ export interface CompileResult {
   executionTime?: number;
 }
 
-const COMPILE_TIMEOUT = 30000; // 30 seconds
-const TEMP_DIR = process.env.TEMP_DIR || "/tmp/compact-playground";
-
 /**
  * Compiles Compact code and returns the result
  */
@@ -33,9 +31,10 @@ export async function compile(
   code: string,
   options: CompileOptions = {}
 ): Promise<CompileResult> {
+  const config = getConfig();
   const startTime = Date.now();
   const sessionId = uuidv4();
-  const sessionDir = join(TEMP_DIR, sessionId);
+  const sessionDir = join(config.tempDir, sessionId);
 
   try {
     // Create temp directory for this compilation
@@ -69,7 +68,7 @@ export async function compile(
 
     const result = await runCompiler(
       compileArgs,
-      options.timeout || COMPILE_TIMEOUT
+      options.timeout || config.compileTimeout
     );
 
     const executionTime = Date.now() - startTime;
@@ -143,8 +142,7 @@ async function runCompiler(
   timeout: number
 ): Promise<CompilerOutput> {
   return new Promise((resolve, reject) => {
-    // Use compactc directly (the actual compiler binary)
-    const compilerPath = process.env.COMPACT_PATH || "compactc";
+    const compilerPath = getConfig().compilerPath;
 
     const proc = spawn(compilerPath, args, {
       timeout,
