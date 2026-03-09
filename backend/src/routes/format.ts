@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { formatCode } from "../formatter.js";
 import { checkRateLimit } from "../rate-limit.js";
+import { resolveRequestedVersion } from "../version-manager.js";
 
 const formatRoutes = new Hono();
 
@@ -12,7 +13,7 @@ formatRoutes.post("/format", async (c) => {
 
   try {
     const body = await c.req.json();
-    const { code, options = {} } = body;
+    const { code, options = {}, versions } = body;
 
     if (!code || typeof code !== "string") {
       return c.json({ success: false, error: "Code is required and must be a string" }, 400);
@@ -22,6 +23,35 @@ formatRoutes.post("/format", async (c) => {
       return c.json({ success: false, error: "Code must be less than 100KB" }, 400);
     }
 
+    // Multi-version: if versions array provided, format with each
+    if (versions && Array.isArray(versions) && versions.length > 0) {
+      // Resolve special version values ("latest", "detect")
+      const resolvedVersions = await Promise.all(
+        versions.map((v: string) => resolveRequestedVersion(v, code))
+      );
+
+      const results = await Promise.allSettled(
+        resolvedVersions.map((version: string) => formatCode(code, { ...options, version }))
+      );
+
+      const matrix = results.map((result, i) => {
+        const requestedVersion = versions[i];
+        const resolvedVersion = resolvedVersions[i];
+        if (result.status === "fulfilled") {
+          return { version: resolvedVersion, requestedVersion, ...result.value };
+        }
+        return {
+          version: resolvedVersion,
+          requestedVersion,
+          success: false,
+          error: result.reason?.message || "Formatting failed",
+        };
+      });
+
+      return c.json({ success: true, results: matrix });
+    }
+
+    // Single version (backward compatible): flat response
     const result = await formatCode(code, options);
     return c.json(result);
   } catch (error) {

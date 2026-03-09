@@ -1,0 +1,10 @@
+pragma language_version >= 0.21;
+
+import CompactStandardLibrary;
+
+export ledger counter: Counter;
+
+// Bug: increment expects Uint<16> not Uint<64>
+export circuit incrementLarge(amount: Uint<64>): [] {
+  counter.increment(amount);
+}

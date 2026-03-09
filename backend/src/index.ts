@@ -7,7 +7,7 @@ import { compileRoutes } from "./routes/compile.js";
 import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
-import { matrixRoutes } from "./routes/matrix.js";
+
 import { healthRoutes } from "./routes/health.js";
 
 const app = new Hono();
@@ -28,7 +28,7 @@ app.route("/", compileRoutes);
 app.route("/", formatRoutes);
 app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
-app.route("/", matrixRoutes);
+
 app.route("/", healthRoutes);
 
 // Root endpoint
@@ -38,14 +38,12 @@ app.get("/", (c) => {
     version: "2.0.0",
     description: "Compile, format, analyze, and diff Compact smart contracts",
     endpoints: {
-      "POST /compile": "Compile Compact code",
-      "POST /format": "Format Compact code",
-      "POST /analyze": "Analyze contract structure (fast/deep)",
+      "POST /compile": "Compile Compact code (versions: [\"latest\", \"detect\", or specific])",
+      "POST /format": "Format Compact code (versions: [\"latest\", \"detect\", or specific])",
+      "POST /analyze": "Analyze contract structure (fast/deep, versions: [\"latest\", \"detect\", or specific])",
       "POST /diff": "Semantic diff between contract versions",
-      "POST /matrix": "Compile against multiple compiler versions",
-      "GET /versions": "List installed compiler versions",
+      "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
-      "GET /version": "Get version information",
     },
   });
 });

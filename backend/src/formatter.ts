@@ -3,10 +3,12 @@ import { mkdir, writeFile, readFile, rm } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "./config.js";
+import { getDefaultVersion } from "./version-manager.js";
 
 export interface FormatOptions {
   diff?: boolean;
   timeout?: number;
+  version?: string;
 }
 
 export interface FormatResult {
@@ -35,11 +37,35 @@ export async function formatCode(
     const sourceFile = join(sessionDir, "contract.compact");
     await writeFile(sourceFile, code, "utf-8");
 
-    // Use `compact format <file>` — the compact CLI wraps the internal format-compact tool
-    const compactCli = process.env.COMPACT_CLI_PATH || "compact";
+    // Use `compact format <file>`
+    const compactCli = config.compactCliPath;
+
+    // Resolve the version to use (explicit or default)
+    const version = options.version || (await getDefaultVersion()) || undefined;
+
+    // Install the resolved version to the session directory for --directory usage
+    if (version) {
+      const updateResult = await runFormatter(
+        compactCli,
+        ["update", version, "--directory", sessionDir],
+        60000
+      );
+      if (updateResult.exitCode !== 0) {
+        return {
+          success: false,
+          error: `Failed to switch to version ${version}: ${updateResult.stderr}`,
+        };
+      }
+    }
+
+    // Build format args — use --directory when we have a version
+    const formatArgs = version
+      ? ["format", "--directory", sessionDir, sourceFile]
+      : ["format", sourceFile];
+
     const result = await runFormatter(
       compactCli,
-      ["format", sourceFile],
+      formatArgs,
       options.timeout || 10000
     );
 
@@ -59,7 +85,7 @@ export async function formatCode(
       changed,
     };
 
-    if (options.diff && changed) {
+    if (changed) {
       formatResult.diff = generateSimpleDiff(code, formatted);
     }
 

@@ -2,7 +2,7 @@ export interface Config {
   port: number;
   defaultCompilerVersion: string;
   tempDir: string;
-  compilerPath: string;
+  compactCliPath: string;
   compileTimeout: number;
   rateLimit: number;
   rateWindow: number;
@@ -20,7 +20,7 @@ export function getConfig(): Config {
     port: parseInt(process.env.PORT || "8080", 10),
     defaultCompilerVersion: process.env.DEFAULT_COMPILER_VERSION || "latest",
     tempDir: process.env.TEMP_DIR || "/tmp/compact-playground",
-    compilerPath: process.env.COMPACT_PATH || "compactc",
+    compactCliPath: process.env.COMPACT_CLI_PATH || "compact",
     compileTimeout: parseInt(process.env.COMPILE_TIMEOUT || "30000", 10),
     rateLimit: parseInt(process.env.RATE_LIMIT || "20", 10),
     rateWindow: parseInt(process.env.RATE_WINDOW || "60000", 10),

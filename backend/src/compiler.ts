@@ -5,12 +5,14 @@ import { v4 as uuidv4 } from "uuid";
 import { wrapWithDefaults, hasPragma } from "./wrapper.js";
 import { parseCompilerErrors, CompilerError } from "./parser.js";
 import { getConfig } from "./config.js";
+import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
   languageVersion?: string;
   skipZk?: boolean;
   timeout?: number;
+  version?: string;
 }
 
 export interface CompileResult {
@@ -40,13 +42,25 @@ export async function compile(
     // Create temp directory for this compilation
     await mkdir(sessionDir, { recursive: true });
 
+    // Resolve the compiler version (explicit or default) once
+    const compilerVersion = options.version || (await getDefaultVersion()) || undefined;
+
     // Determine if we need to wrap the code
     let finalCode = code;
     const needsWrapping =
       options.wrapWithDefaults !== false && !hasPragma(code);
 
     if (needsWrapping) {
-      finalCode = wrapWithDefaults(code, options.languageVersion);
+      // Dynamically resolve language version from the compiler that will be used
+      let languageVersion = options.languageVersion;
+      if (!languageVersion && compilerVersion) {
+        try {
+          languageVersion = await getCompilerLanguageVersion(compilerVersion);
+        } catch {
+          // Fall back to DEFAULT_MIN_VERSION in wrapper
+        }
+      }
+      finalCode = wrapWithDefaults(code, languageVersion);
     }
 
     // Write the code to a temp file
@@ -55,9 +69,13 @@ export async function compile(
     await writeFile(sourceFile, finalCode, "utf-8");
     await mkdir(outputDir, { recursive: true });
 
-    // Run the compiler
-    // compactc takes: [flags] <source-file> <output-dir>
-    const compileArgs: string[] = [];
+    // Run the compiler via `compact compile [+VERSION] [FLAGS] <source> <output>`
+    const compileArgs: string[] = ["compile"];
+
+    // Always use explicit +VERSION to avoid reliance on CLI default
+    if (compilerVersion) {
+      compileArgs.push(`+${compilerVersion}`);
+    }
 
     // Use --skip-zk for faster compilation (syntax checking only)
     if (options.skipZk !== false) {
@@ -142,9 +160,9 @@ async function runCompiler(
   timeout: number
 ): Promise<CompilerOutput> {
   return new Promise((resolve, reject) => {
-    const compilerPath = getConfig().compilerPath;
+    const compactCli = getConfig().compactCliPath;
 
-    const proc = spawn(compilerPath, args, {
+    const proc = spawn(compactCli, args, {
       timeout,
       env: {
         ...process.env,
@@ -183,7 +201,7 @@ async function runCompiler(
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         reject(
           new Error(
-            "Compact compiler (compactc) not found. Please ensure it is installed and in PATH."
+            "Compact CLI not found. Please ensure it is installed and in PATH."
           )
         );
       } else {

@@ -5,9 +5,8 @@
  * pragma and imports to make them compilable.
  */
 
-// Default language version range
-const DEFAULT_MIN_VERSION = "0.16";
-const DEFAULT_MAX_VERSION = "0.18";
+// Default language version (open-ended, no upper bound)
+const DEFAULT_MIN_VERSION = "0.14";
 
 /**
  * Checks if the code contains a pragma statement
@@ -42,13 +41,12 @@ export function wrapWithDefaults(code: string, languageVersion?: string): string
   }
 
   const minVersion = languageVersion || DEFAULT_MIN_VERSION;
-  const maxVersion = DEFAULT_MAX_VERSION;
 
   // Build the wrapper
   const parts: string[] = [];
 
-  // Add pragma
-  parts.push(`pragma language_version >= ${minVersion} && <= ${maxVersion};`);
+  // Add pragma (open-ended, no upper bound)
+  parts.push(`pragma language_version >= ${minVersion};`);
   parts.push("");
 
   // Add standard library import if not present
@@ -119,9 +117,8 @@ export function smartWrap(
   // For unknown/expression snippets, wrap in a test circuit if requested
   if (options.addTestCircuit && snippetType === "unknown") {
     const minVersion = options.languageVersion || DEFAULT_MIN_VERSION;
-    const maxVersion = DEFAULT_MAX_VERSION;
 
-    return `pragma language_version >= ${minVersion} && <= ${maxVersion};
+    return `pragma language_version >= ${minVersion};
 
 import CompactStandardLibrary;
 

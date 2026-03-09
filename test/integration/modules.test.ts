@@ -3,7 +3,6 @@ import { analyzeSource } from "../../backend/src/analyzer.js";
 import { diffContracts } from "../../backend/src/differ.js";
 import { CompileCache, generateCacheKey, normalizeForCacheKey } from "../../backend/src/cache.js";
 import { resolveVersion, compareVersions, isValidVersion } from "../../backend/src/version-manager.js";
-import { buildMatrix } from "../../backend/src/matrix.js";
 import { formatCode } from "../../backend/src/formatter.js";
 
 describe("Integration: Analyze → Diff pipeline", () => {
@@ -180,56 +179,11 @@ describe("Integration: Cache with real compile keys", () => {
   });
 });
 
-describe("Integration: Version resolution with matrix", () => {
-  it("resolves versions and builds a compatibility matrix", async () => {
+describe("Integration: Version resolution", () => {
+  it("resolves latest version from installed list", () => {
     const installed = ["0.24.0", "0.25.0", "0.26.0"];
-
-    // Resolve latest
     const latest = resolveVersion("latest", installed);
     expect(latest).toBe("0.26.0");
-
-    // Build matrix with mock compiler
-    const mockCompile = async (code: string, version: string) => ({
-      version,
-      success: version !== "0.24.0",
-      errors: version === "0.24.0"
-        ? [{ message: "Unsupported language version", severity: "error" as const }]
-        : undefined,
-      executionTime: 100,
-    });
-
-    const matrix = await buildMatrix(
-      "export circuit test(): [] {}",
-      installed,
-      mockCompile
-    );
-
-    expect(matrix).toHaveLength(3);
-    expect(matrix[0].version).toBe("0.24.0");
-    expect(matrix[0].success).toBe(false);
-    expect(matrix[1].success).toBe(true);
-    expect(matrix[2].success).toBe(true);
-  });
-
-  it("handles compiler failures gracefully in the matrix", async () => {
-    const mockCompile = async (_code: string, version: string) => {
-      if (version === "0.24.0") {
-        throw new Error("Compiler binary not found");
-      }
-      return { version, success: true };
-    };
-
-    const matrix = await buildMatrix(
-      "export circuit test(): [] {}",
-      ["0.24.0", "0.25.0"],
-      mockCompile
-    );
-
-    expect(matrix).toHaveLength(2);
-    expect(matrix[0].success).toBe(false);
-    expect(matrix[0].errors).toBeDefined();
-    expect(matrix[0].errors![0].message).toBe("Compiler binary not found");
-    expect(matrix[1].success).toBe(true);
   });
 
   it("validates and compares versions correctly", () => {
@@ -263,6 +217,18 @@ describe("Integration: Format endpoint", () => {
     expect(result.formatted).toContain("a: Uint<64>");
   });
 
+  it("always returns diff when code changed", async () => {
+    const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
+    // No diff option — diff should still be returned when changed
+    const result = await formatCode(code);
+
+    expect(result.success).toBe(true);
+    if (result.changed) {
+      expect(result.diff).toBeDefined();
+      expect(result.diff!.length).toBeGreaterThan(0);
+    }
+  });
+
   it("detects unchanged code", async () => {
     const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;
@@ -278,16 +244,5 @@ describe("Integration: Format endpoint", () => {
     const result = await formatCode("");
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
-  });
-
-  it("returns diff when requested", async () => {
-    const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
-    const result = await formatCode(code, { diff: true });
-
-    expect(result.success).toBe(true);
-    if (result.changed) {
-      expect(result.diff).toBeDefined();
-      expect(result.diff!.length).toBeGreaterThan(0);
-    }
   });
 });

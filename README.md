@@ -203,7 +203,7 @@ curl http://localhost:8080/health
 | `PORT` | `8080` | Server port |
 | `DEFAULT_COMPILER_VERSION` | `latest` | Default compiler version. Set to a specific version (e.g. `0.26.0`) for Learn Compact compatibility. |
 | `TEMP_DIR` | `/tmp/compact-playground` | Temporary directory for compilation |
-| `COMPACT_PATH` | `compactc` | Path to the compiler binary |
+| `COMPACT_CLI_PATH` | `compact` | Path to the compact CLI |
 | `COMPILE_TIMEOUT` | `30000` | Compilation timeout in ms |
 | `RATE_LIMIT` | `20` | Max requests per window per IP |
 | `RATE_WINDOW` | `60000` | Rate limit window in ms |

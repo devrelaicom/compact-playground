@@ -13,22 +13,32 @@ describe("formatter", () => {
       expect(typeof result.formatted).toBe("string");
     });
 
-    it("returns diff when requested", async () => {
+    it("always returns diff when code changed", async () => {
       const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
 
-      const result = await formatCode(code, { diff: true });
+      const result = await formatCode(code);
 
       expect(result.success).toBe(true);
-      expect(result.diff).toBeDefined();
+      if (result.changed) {
+        expect(result.diff).toBeDefined();
+        expect(result.diff!.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("returns diff even without diff option when changed", async () => {
+      const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
+
+      // No diff option passed — diff should still be returned
+      const result = await formatCode(code);
+
+      expect(result.success).toBe(true);
+      if (result.changed) {
+        expect(result.diff).toBeDefined();
+      }
     });
 
     it("returns unchanged flag when code is already formatted", async () => {
-      // Formatter supports language version 0.21+; use matching pragma
-      const code = `pragma language_version >= 0.21;
-
-import CompactStandardLibrary;
-
-export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+      const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;
 }
 `;

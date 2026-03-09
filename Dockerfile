@@ -42,27 +42,30 @@ RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compac
     && chmod +x /root/.compact/bin/compact \
     && rm -rf /tmp/compact.tar.xz /tmp/compact-extract
 
-# Download Compact Compiler (compactc-v0.26.0)
-# The zip contains: compactc (wrapper script), compactc.bin, zkir, fixup-compact, format-compact
-RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compactc-v0.26.0/compactc_v0.26.0_x86_64-unknown-linux-musl.zip \
-       -o /tmp/compactc.zip \
-    && unzip -q /tmp/compactc.zip -d /root/.compact/bin/ \
-    && chmod +x /root/.compact/bin/compactc \
-    && chmod +x /root/.compact/bin/compactc.bin \
-    && chmod +x /root/.compact/bin/zkir \
-    && chmod +x /root/.compact/bin/fixup-compact 2>/dev/null || true \
-    && chmod +x /root/.compact/bin/format-compact 2>/dev/null || true \
-    && rm -rf /tmp/compactc.zip
-
 # Set up PATH
 ENV PATH="/root/.compact/bin:$PATH"
 
+# Build arg for admin to set default compiler version
+ARG DEFAULT_COMPILER=latest
+
+# Pre-install all available compiler versions
+RUN compact update 0.29.0 \
+    && compact update 0.28.0 \
+    && compact update 0.26.0 \
+    && compact update 0.25.0 \
+    && compact update 0.24.0 \
+    && compact update 0.23.0 \
+    && compact update 0.22.0
+
+# Set the CLI default — explicit version or latest (0.29.0)
+RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
+      compact update "$DEFAULT_COMPILER"; \
+    else \
+      compact update 0.29.0; \
+    fi
+
 # Verify installation
-RUN echo "=== Compact Installation ===" \
-    && echo "Files in .compact/bin:" && ls -la /root/.compact/bin/ \
-    && echo "CLI version:" && compact --version \
-    && echo "Compiler version:" && compactc --version \
-    && echo "=== Installation Complete ==="
+RUN compact --version && compact list --installed
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -76,8 +79,8 @@ RUN mkdir -p /tmp/compact-playground
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV TEMP_DIR=/tmp/compact-playground
-ENV COMPACT_PATH=compactc
-ENV DEFAULT_COMPILER_VERSION=latest
+ENV COMPACT_CLI_PATH=compact
+ENV DEFAULT_COMPILER_VERSION=$DEFAULT_COMPILER
 ENV CACHE_ENABLED=true
 ENV CACHE_MAX_SIZE=1000
 ENV CACHE_TTL=3600000

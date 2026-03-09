@@ -11,7 +11,7 @@ import {
 describe("wrapper utilities", () => {
   describe("hasPragma", () => {
     it("returns true when pragma is present", () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;
+      const code = `pragma language_version >= 0.21;
 import CompactStandardLibrary;`;
       expect(hasPragma(code)).toBe(true);
     });
@@ -24,7 +24,7 @@ import CompactStandardLibrary;`;
     });
 
     it("handles case-insensitive pragma", () => {
-      const code = `PRAGMA language_version >= 0.16 && <= 0.18;`;
+      const code = `PRAGMA language_version >= 0.21;`;
       expect(hasPragma(code)).toBe(true);
     });
   });
@@ -48,13 +48,13 @@ import CompactStandardLibrary;`;
 }`;
       const wrapped = wrapWithDefaults(code);
 
-      expect(wrapped).toContain("pragma language_version >= 0.16 && <= 0.18;");
+      expect(wrapped).toContain("pragma language_version >= 0.14;");
       expect(wrapped).toContain("import CompactStandardLibrary;");
       expect(wrapped).toContain(code);
     });
 
     it("does not wrap code that already has pragma", () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;
+      const code = `pragma language_version >= 0.21;
 import CompactStandardLibrary;
 export ledger counter: Counter;`;
 
@@ -77,13 +77,13 @@ export ledger counter: Counter;`;
       const code = `export ledger counter: Counter;`;
       const wrapped = wrapWithDefaults(code, "0.17");
 
-      expect(wrapped).toContain("pragma language_version >= 0.17 && <= 0.18;");
+      expect(wrapped).toContain("pragma language_version >= 0.17;");
     });
   });
 
   describe("detectSnippetType", () => {
     it("detects complete contracts", () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;
+      const code = `pragma language_version >= 0.21;
 import CompactStandardLibrary;`;
       expect(detectSnippetType(code)).toBe("complete");
     });
@@ -128,7 +128,7 @@ import CompactStandardLibrary;`;
 
   describe("smartWrap", () => {
     it("does not wrap complete contracts", () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;
+      const code = `pragma language_version >= 0.21;
 import CompactStandardLibrary;
 export ledger counter: Counter;`;
 
@@ -158,7 +158,7 @@ export ledger counter: Counter;`;
 
   describe("getWrapperLineOffset", () => {
     it("returns 0 for code with pragma", () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;`;
+      const code = `pragma language_version >= 0.21;`;
       expect(getWrapperLineOffset(code)).toBe(0);
     });
 

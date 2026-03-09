@@ -14,13 +14,13 @@ export async function isCompilerInstalled(): Promise<boolean> {
 }
 
 /**
- * Gets the version of the installed Compact compiler
+ * Gets the version of the installed Compact CLI
  */
 export async function getCompilerVersion(): Promise<string | null> {
   return new Promise((resolve) => {
-    const compilerPath = getConfig().compilerPath;
+    const compactCli = getConfig().compactCliPath;
 
-    const proc = spawn(compilerPath, ["--version"], {
+    const proc = spawn(compactCli, ["--version"], {
       timeout: 5000,
     });
 
@@ -32,8 +32,7 @@ export async function getCompilerVersion(): Promise<string | null> {
 
     proc.on("close", (code) => {
       if (code === 0 && stdout) {
-        // Extract version number from output
-        // Expected format: "0.26.0" or similar
+        // Expected format: "compact 0.4.0"
         const versionMatch = stdout.match(/(\d+\.\d+\.\d+)/);
         resolve(versionMatch ? versionMatch[1] : stdout.trim());
       } else {
