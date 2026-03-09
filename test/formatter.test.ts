@@ -23,12 +23,13 @@ describe("formatter", () => {
     });
 
     it("returns unchanged flag when code is already formatted", async () => {
-      const code = `pragma language_version >= 0.16 && <= 0.18;
+      // Formatter supports language version 0.21+; use matching pragma
+      const code = `pragma language_version >= 0.21;
 
 import CompactStandardLibrary;
 
 export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
-    return (a + b) as Uint<64>;
+  return (a + b) as Uint<64>;
 }
 `;
 

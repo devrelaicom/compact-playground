@@ -1,0 +1,118 @@
+import { analyzeSource, type CircuitInfo, type LedgerInfo } from "./analyzer.js";
+
+export interface CircuitDiff {
+  name: string;
+  changes: string[]; // which aspects changed: "params", "returnType", "exported", "pure"
+  before?: CircuitInfo;
+  after?: CircuitInfo;
+}
+
+export interface LedgerDiff {
+  name: string;
+  before?: string;
+  after?: string;
+}
+
+export interface DiffResult {
+  hasChanges: boolean;
+  circuits: {
+    added: CircuitInfo[];
+    removed: CircuitInfo[];
+    modified: CircuitDiff[];
+  };
+  ledger: {
+    added: LedgerInfo[];
+    removed: LedgerInfo[];
+    modified: LedgerDiff[];
+  };
+  pragma: {
+    before: string | null;
+    after: string | null;
+    changed: boolean;
+  };
+  imports: {
+    added: string[];
+    removed: string[];
+  };
+}
+
+export function diffContracts(before: string, after: string): DiffResult {
+  const beforeAnalysis = analyzeSource(before);
+  const afterAnalysis = analyzeSource(after);
+
+  // Diff circuits
+  const beforeCircuits = new Map(beforeAnalysis.circuits.map((c) => [c.name, c]));
+  const afterCircuits = new Map(afterAnalysis.circuits.map((c) => [c.name, c]));
+
+  const addedCircuits = afterAnalysis.circuits.filter((c) => !beforeCircuits.has(c.name));
+  const removedCircuits = beforeAnalysis.circuits.filter((c) => !afterCircuits.has(c.name));
+
+  const modifiedCircuits: CircuitDiff[] = [];
+  for (const [name, beforeCircuit] of beforeCircuits) {
+    const afterCircuit = afterCircuits.get(name);
+    if (!afterCircuit) continue;
+
+    const changes: string[] = [];
+    if (JSON.stringify(beforeCircuit.params) !== JSON.stringify(afterCircuit.params)) {
+      changes.push("params");
+    }
+    if (beforeCircuit.returnType !== afterCircuit.returnType) {
+      changes.push("returnType");
+    }
+    if (beforeCircuit.exported !== afterCircuit.exported) {
+      changes.push("exported");
+    }
+    if (beforeCircuit.pure !== afterCircuit.pure) {
+      changes.push("pure");
+    }
+
+    if (changes.length > 0) {
+      modifiedCircuits.push({ name, changes, before: beforeCircuit, after: afterCircuit });
+    }
+  }
+
+  // Diff ledger
+  const beforeLedger = new Map(beforeAnalysis.ledger.map((l) => [l.name, l]));
+  const afterLedger = new Map(afterAnalysis.ledger.map((l) => [l.name, l]));
+
+  const addedLedger = afterAnalysis.ledger.filter((l) => !beforeLedger.has(l.name));
+  const removedLedger = beforeAnalysis.ledger.filter((l) => !afterLedger.has(l.name));
+
+  const modifiedLedger: LedgerDiff[] = [];
+  for (const [name, beforeField] of beforeLedger) {
+    const afterField = afterLedger.get(name);
+    if (!afterField) continue;
+
+    if (beforeField.type !== afterField.type) {
+      modifiedLedger.push({ name, before: beforeField.type, after: afterField.type });
+    }
+  }
+
+  // Diff imports
+  const beforeImports = new Set(beforeAnalysis.imports);
+  const afterImports = new Set(afterAnalysis.imports);
+  const addedImports = afterAnalysis.imports.filter((i) => !beforeImports.has(i));
+  const removedImports = beforeAnalysis.imports.filter((i) => !afterImports.has(i));
+
+  // Diff pragma
+  const pragmaChanged = beforeAnalysis.pragma !== afterAnalysis.pragma;
+
+  const hasChanges =
+    addedCircuits.length > 0 ||
+    removedCircuits.length > 0 ||
+    modifiedCircuits.length > 0 ||
+    addedLedger.length > 0 ||
+    removedLedger.length > 0 ||
+    modifiedLedger.length > 0 ||
+    addedImports.length > 0 ||
+    removedImports.length > 0 ||
+    pragmaChanged;
+
+  return {
+    hasChanges,
+    circuits: { added: addedCircuits, removed: removedCircuits, modified: modifiedCircuits },
+    ledger: { added: addedLedger, removed: removedLedger, modified: modifiedLedger },
+    pragma: { before: beforeAnalysis.pragma, after: afterAnalysis.pragma, changed: pragmaChanged },
+    imports: { added: addedImports, removed: removedImports },
+  };
+}

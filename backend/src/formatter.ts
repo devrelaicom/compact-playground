@@ -35,10 +35,11 @@ export async function formatCode(
     const sourceFile = join(sessionDir, "contract.compact");
     await writeFile(sourceFile, code, "utf-8");
 
-    const formatterPath = process.env.FORMAT_COMPACT_PATH || "format-compact";
+    // Use `compact format <file>` — the compact CLI wraps the internal format-compact tool
+    const compactCli = process.env.COMPACT_CLI_PATH || "compact";
     const result = await runFormatter(
-      formatterPath,
-      [sourceFile],
+      compactCli,
+      ["format", sourceFile],
       options.timeout || 10000
     );
 
@@ -95,7 +96,7 @@ function runFormatter(
 
     proc.on("error", (error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new Error("format-compact not found. Ensure it is installed and in PATH."));
+        reject(new Error("compact CLI not found. Ensure it is installed and in PATH."));
       } else {
         reject(error);
       }
