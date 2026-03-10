@@ -1,12 +1,11 @@
 import { Hono } from "hono";
 import { diffContracts } from "../differ.js";
-import { checkRateLimit } from "../rate-limit.js";
+import { checkRateLimit, getClientIp } from "../rate-limit.js";
 
 const diffRoutes = new Hono();
 
 diffRoutes.post("/diff", async (c) => {
-  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(getClientIp(c))) {
     return c.json({ success: false, error: "Rate limit exceeded" }, 429);
   }
 

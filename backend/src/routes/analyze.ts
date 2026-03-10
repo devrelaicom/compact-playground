@@ -1,14 +1,13 @@
 import { Hono } from "hono";
 import { analyzeSource } from "../analyzer.js";
 import { compile } from "../compiler.js";
-import { checkRateLimit } from "../rate-limit.js";
-import { resolveRequestedVersion } from "../version-manager.js";
+import { checkRateLimit, getClientIp } from "../rate-limit.js";
+import { runMultiVersion } from "../middleware.js";
 
 const analyzeRoutes = new Hono();
 
 analyzeRoutes.post("/analyze", async (c) => {
-  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(getClientIp(c))) {
     return c.json({ success: false, error: "Rate limit exceeded" }, 429);
   }
 
@@ -30,35 +29,13 @@ analyzeRoutes.post("/analyze", async (c) => {
 
       // Multi-version deep analysis
       if (versions && Array.isArray(versions) && versions.length > 0) {
-        // Resolve special version values ("latest", "detect")
-        const resolvedVersions = await Promise.all(
-          versions.map((v: string) => resolveRequestedVersion(v, code))
-        );
-
-        const compileResults = await Promise.allSettled(
-          resolvedVersions.map((version: string) =>
-            compile(code, { wrapWithDefaults: true, skipZk: true, version })
-          )
-        );
-
-        const compilations = compileResults.map((result, i) => {
-          const requestedVersion = versions[i];
-          const resolvedVersion = resolvedVersions[i];
-          if (result.status === "fulfilled") {
-            return {
-              version: resolvedVersion,
-              requestedVersion,
-              success: result.value.success,
-              errors: result.value.errors,
-              warnings: result.value.warnings,
-              executionTime: result.value.executionTime,
-            };
-          }
+        const compilations = await runMultiVersion(versions, code, async (version) => {
+          const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
           return {
-            version: resolvedVersion,
-            requestedVersion,
-            success: false,
-            errors: [{ message: result.reason?.message || "Compilation failed", severity: "error" }],
+            success: result.success,
+            errors: result.errors,
+            warnings: result.warnings,
+            executionTime: result.executionTime,
           };
         });
 

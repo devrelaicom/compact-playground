@@ -9,6 +9,8 @@ export interface Config {
   cacheEnabled: boolean;
   cacheMaxSize: number;
   cacheTtl: number;
+  maxVersionsPerRequest: number;
+  maxCodeSize: number;
 }
 
 let _config: Config | null = null;
@@ -27,6 +29,8 @@ export function getConfig(): Config {
     cacheEnabled: process.env.CACHE_ENABLED !== "false",
     cacheMaxSize: parseInt(process.env.CACHE_MAX_SIZE || "1000", 10),
     cacheTtl: parseInt(process.env.CACHE_TTL || "3600000", 10), // 1 hour
+    maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "10", 10),
+    maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
   };
 
   return _config;

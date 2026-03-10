@@ -51,11 +51,19 @@ export function resolveVersion(
   return null;
 }
 
+// Cache for listInstalledVersions to avoid repeated subprocess spawns
+let installedVersionsCache: { versions: string[]; timestamp: number } | null = null;
+const INSTALLED_VERSIONS_TTL = 30_000; // 30 seconds
+
 /**
  * Discovers installed compiler versions by running `compact list --installed`
- * or by scanning the compact directory.
+ * or by scanning the compact directory. Results are cached for 30 seconds.
  */
 export async function listInstalledVersions(): Promise<string[]> {
+  if (installedVersionsCache && Date.now() - installedVersionsCache.timestamp < INSTALLED_VERSIONS_TTL) {
+    return installedVersionsCache.versions;
+  }
+
   return new Promise((resolve) => {
     const compactCli = getConfig().compactCliPath;
     const proc = spawn(compactCli, ["list", "--installed"], { timeout: 5000 });
@@ -74,6 +82,7 @@ export async function listInstalledVersions(): Promise<string[]> {
             return match ? match[1] : "";
           })
           .filter((line) => isValidVersion(line));
+        installedVersionsCache = { versions, timestamp: Date.now() };
         resolve(versions);
       } else {
         resolve([]);
@@ -260,12 +269,19 @@ export async function resolveRequestedVersion(version: string, code: string): Pr
     return defaultVer;
   }
 
+  if (!isValidVersion(version)) {
+    throw new Error(
+      `Invalid version format: ${version}. Expected semver like "0.29.0"`
+    );
+  }
+
   return version;
 }
 
 /** Reset language version cache (for testing) */
 export function resetLanguageVersionCache(): void {
   languageVersionCache.clear();
+  installedVersionsCache = null;
 }
 
 // Cache of versions that have been ensured (installed to their isolated directory)

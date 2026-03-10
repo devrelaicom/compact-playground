@@ -4,6 +4,7 @@ import {
   isValidVersion,
   compareVersions,
   resolveVersion,
+  resolveRequestedVersion,
 } from "../backend/src/version-manager.js";
 
 describe("version-manager", () => {
@@ -57,6 +58,37 @@ describe("version-manager", () => {
 
     it("returns null for empty installed list", () => {
       expect(resolveVersion("latest", [])).toBeNull();
+    });
+  });
+
+  describe("resolveRequestedVersion", () => {
+    it("rejects path traversal strings", async () => {
+      await expect(
+        resolveRequestedVersion("../../etc/passwd", "")
+      ).rejects.toThrow("Invalid version format");
+    });
+
+    it("rejects command injection strings", async () => {
+      await expect(
+        resolveRequestedVersion("1.0.0; rm -rf /", "")
+      ).rejects.toThrow("Invalid version format");
+    });
+
+    it("rejects empty strings", async () => {
+      await expect(
+        resolveRequestedVersion("", "")
+      ).rejects.toThrow("Invalid version format");
+    });
+
+    it("rejects partial versions", async () => {
+      await expect(
+        resolveRequestedVersion("0.26", "")
+      ).rejects.toThrow("Invalid version format");
+    });
+
+    it("accepts valid semver strings", async () => {
+      const result = await resolveRequestedVersion("0.29.0", "");
+      expect(result).toBe("0.29.0");
     });
   });
 });

@@ -2,10 +2,30 @@ import { spawn } from "child_process";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
-import { wrapWithDefaults, hasPragma } from "./wrapper.js";
+import { wrapWithDefaults, hasPragma, getWrapperLineOffset } from "./wrapper.js";
 import { parseCompilerErrors, CompilerError } from "./parser.js";
 import { getConfig } from "./config.js";
 import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
+import { CompileCache, generateCacheKey } from "./cache.js";
+
+let compileCache: CompileCache | null = null;
+
+function getCache(): CompileCache | null {
+  const config = getConfig();
+  if (!config.cacheEnabled) return null;
+  if (!compileCache) {
+    compileCache = new CompileCache({
+      maxSize: config.cacheMaxSize,
+      ttl: config.cacheTtl,
+    });
+  }
+  return compileCache;
+}
+
+/** Reset compile cache (for testing) */
+export function resetCompileCache(): void {
+  compileCache = null;
+}
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -43,7 +63,25 @@ export async function compile(
     await mkdir(sessionDir, { recursive: true });
 
     // Resolve the compiler version (explicit or default) once
-    const compilerVersion = options.version || (await getDefaultVersion()) || undefined;
+    const compilerVersion = options.version || (await getDefaultVersion());
+
+    // Check cache before doing any work
+    const cache = getCache();
+    const cacheKey = cache
+      ? generateCacheKey(
+          code,
+          compilerVersion || "default",
+          { wrapWithDefaults: options.wrapWithDefaults, skipZk: options.skipZk }
+        )
+      : null;
+
+    if (cache && cacheKey) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        // Cache stores full CompileResult objects from successful compilations
+        return cached as CompileResult;
+      }
+    }
 
     // Determine if we need to wrap the code
     let finalCode = code;
@@ -94,7 +132,7 @@ export async function compile(
     if (result.exitCode === 0) {
       // Success
       const warnings = parseCompilerErrors(result.stderr);
-      return {
+      const compileResult: CompileResult = {
         success: true,
         output: "Compilation successful",
         warnings: warnings.length > 0 ? warnings : undefined,
@@ -103,14 +141,19 @@ export async function compile(
         wrappedCode: needsWrapping ? finalCode : undefined,
         executionTime,
       };
+
+      if (cache && cacheKey) {
+        cache.set(cacheKey, compileResult);
+      }
+
+      return compileResult;
     } else {
       // Compilation failed
       const errors = parseCompilerErrors(result.stderr || result.stdout);
 
       // Adjust line numbers if code was wrapped
       if (needsWrapping && errors.length > 0) {
-        // The wrapper adds 4 lines before user code
-        const wrapperLines = 4;
+        const wrapperLines = getWrapperLineOffset(code);
         errors.forEach((error) => {
           if (error.line && error.line > wrapperLines) {
             error.line -= wrapperLines;
@@ -163,7 +206,6 @@ async function runCompiler(
     const compactCli = getConfig().compactCliPath;
 
     const proc = spawn(compactCli, args, {
-      timeout,
       env: {
         ...process.env,
         // Ensure TERM is set for proper output
@@ -173,6 +215,7 @@ async function runCompiler(
 
     let stdout = "";
     let stderr = "";
+    let settled = false;
 
     proc.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -183,29 +226,38 @@ async function runCompiler(
     });
 
     const timeoutId = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error("Compilation timed out"));
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGTERM");
+        reject(new Error("Compilation timed out"));
+      }
     }, timeout);
 
     proc.on("close", (code) => {
       clearTimeout(timeoutId);
-      resolve({
-        exitCode: code ?? 1,
-        stdout,
-        stderr,
-      });
+      if (!settled) {
+        settled = true;
+        resolve({
+          exitCode: code ?? 1,
+          stdout,
+          stderr,
+        });
+      }
     });
 
     proc.on("error", (error) => {
       clearTimeout(timeoutId);
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(
-          new Error(
-            "Compact CLI not found. Please ensure it is installed and in PATH."
-          )
-        );
-      } else {
-        reject(error);
+      if (!settled) {
+        settled = true;
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          reject(
+            new Error(
+              "Compact CLI not found. Please ensure it is installed and in PATH."
+            )
+          );
+        } else {
+          reject(error);
+        }
       }
     });
   });

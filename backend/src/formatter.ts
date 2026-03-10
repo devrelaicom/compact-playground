@@ -3,7 +3,7 @@ import { mkdir, writeFile, readFile, rm } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "./config.js";
-import { getDefaultVersion } from "./version-manager.js";
+import { getDefaultVersion, ensureVersion } from "./version-manager.js";
 
 export interface FormatOptions {
   diff?: boolean;
@@ -41,26 +41,24 @@ export async function formatCode(
     const compactCli = config.compactCliPath;
 
     // Resolve the version to use (explicit or default)
-    const version = options.version || (await getDefaultVersion()) || undefined;
+    const version = options.version || (await getDefaultVersion());
 
-    // Install the resolved version to the session directory for --directory usage
+    // Ensure the version is installed (cached across requests)
+    let versionDir: string | null = null;
     if (version) {
-      const updateResult = await runFormatter(
-        compactCli,
-        ["update", version, "--directory", sessionDir],
-        60000
-      );
-      if (updateResult.exitCode !== 0) {
+      try {
+        versionDir = await ensureVersion(version);
+      } catch (err) {
         return {
           success: false,
-          error: `Failed to switch to version ${version}: ${updateResult.stderr}`,
+          error: `Failed to ensure version ${version}: ${err instanceof Error ? err.message : String(err)}`,
         };
       }
     }
 
-    // Build format args — use --directory when we have a version
-    const formatArgs = version
-      ? ["format", "--directory", sessionDir, sourceFile]
+    // Build format args — use --directory when we have a version dir
+    const formatArgs = versionDir
+      ? ["format", "--directory", versionDir, sourceFile]
       : ["format", sourceFile];
 
     const result = await runFormatter(
@@ -106,25 +104,41 @@ function runFormatter(
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(path, args, {
-      timeout,
       env: { ...process.env, TERM: "dumb" },
     });
 
     let stdout = "";
     let stderr = "";
+    let settled = false;
 
     proc.stdout.on("data", (data) => (stdout += data.toString()));
     proc.stderr.on("data", (data) => (stderr += data.toString()));
 
+    const timeoutId = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGTERM");
+        reject(new Error("Formatting timed out"));
+      }
+    }, timeout);
+
     proc.on("close", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
+      clearTimeout(timeoutId);
+      if (!settled) {
+        settled = true;
+        resolve({ exitCode: code ?? 1, stdout, stderr });
+      }
     });
 
     proc.on("error", (error) => {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new Error("compact CLI not found. Ensure it is installed and in PATH."));
-      } else {
-        reject(error);
+      clearTimeout(timeoutId);
+      if (!settled) {
+        settled = true;
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          reject(new Error("compact CLI not found. Ensure it is installed and in PATH."));
+        } else {
+          reject(error);
+        }
       }
     });
   });

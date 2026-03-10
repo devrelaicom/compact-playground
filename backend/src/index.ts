@@ -7,6 +7,7 @@ import { compileRoutes } from "./routes/compile.js";
 import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
+import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes } from "./routes/health.js";
 
@@ -22,6 +23,8 @@ app.use(
     allowHeaders: ["Content-Type"],
   })
 );
+
+app.use("*", validateRequestBody);
 
 // Mount routes
 app.route("/", compileRoutes);

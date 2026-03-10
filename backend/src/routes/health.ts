@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { isCompilerInstalled, getCompilerVersion } from "../utils.js";
-import { listInstalledVersions, getDefaultVersion, buildLanguageVersionMap } from "../version-manager.js";
+import { getCompilerVersion } from "../utils.js";
+import { listInstalledVersions, getDefaultVersion, buildLanguageVersionMap, resolveVersion } from "../version-manager.js";
 
 const healthRoutes = new Hono();
 
 healthRoutes.get("/health", async (c) => {
-  const cliInstalled = await isCompilerInstalled();
-  const cliVersion = cliInstalled ? await getCompilerVersion() : null;
+  const cliVersion = await getCompilerVersion();
+  const cliInstalled = cliVersion !== null;
 
   return c.json({
     status: cliInstalled ? "healthy" : "degraded",
@@ -19,8 +19,8 @@ healthRoutes.get("/health", async (c) => {
 });
 
 healthRoutes.get("/versions", async (c) => {
-  const defaultVersion = await getDefaultVersion();
   const installed = await listInstalledVersions();
+  const defaultVersion = resolveVersion("latest", installed);
 
   let langMap: Map<string, string>;
   try {
