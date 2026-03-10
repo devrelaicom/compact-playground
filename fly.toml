@@ -1,25 +1,30 @@
-app = "compact-playground"
-primary_region = "iad"
+# fly.toml app configuration file generated for compact-playground on 2026-03-10T09:11:57Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'compact-playground'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [checks]
   [checks.health]
-    type = "http"
     port = 8080
-    path = "/health"
-    interval = "30s"
-    timeout = "10s"
-    grace_period = "30s"
+    type = 'http'
+    interval = '30s'
+    timeout = '10s'
+    grace_period = '30s'
+    path = '/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
