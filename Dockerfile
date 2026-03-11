@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-slim AS builder
+FROM node:25-slim AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY backend/ ./backend/
 RUN npm run build
 
 # Production stage
-FROM node:22-slim AS production
+FROM node:25-slim AS production
 
 # Install required packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
