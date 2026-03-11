@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { runMultiVersion, validateRequestBody } from "../backend/src/middleware.js";
+import { HAS_COMPACT_CLI } from "./helpers.js";
 
-describe("runMultiVersion", () => {
+describe.skipIf(!HAS_COMPACT_CLI)("runMultiVersion", () => {
   it("executes operation for each resolved version", async () => {
     const executor = (version: string) =>
       Promise.resolve({

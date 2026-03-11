@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { formatCode } from "../backend/src/formatter.js";
+import { HAS_COMPACT_CLI } from "./helpers.js";
 
-describe("formatter", () => {
+describe.skipIf(!HAS_COMPACT_CLI)("formatter", () => {
   describe("formatCode", () => {
     it("returns formatted code and indicates if changes were made", async () => {
       const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;

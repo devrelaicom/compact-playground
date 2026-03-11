@@ -8,6 +8,7 @@ import {
   isValidVersion,
 } from "../../backend/src/version-manager.js";
 import { formatCode } from "../../backend/src/formatter.js";
+import { HAS_COMPACT_CLI } from "../helpers.js";
 
 describe("Integration: Analyze → Diff pipeline", () => {
   it("analyzes two contracts and diffs them end-to-end", () => {
@@ -213,7 +214,7 @@ describe("Integration: Version resolution", () => {
   });
 });
 
-describe("Integration: Format endpoint", () => {
+describe.skipIf(!HAS_COMPACT_CLI)("Integration: Format endpoint", () => {
   it("formats code using compact CLI", async () => {
     const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
     const result = await formatCode(code);
