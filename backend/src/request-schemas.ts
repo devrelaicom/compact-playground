@@ -1,0 +1,33 @@
+import { z } from "zod";
+
+export const compileBodySchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  options: z.object({
+    wrapWithDefaults: z.boolean().optional(),
+    languageVersion: z.string().optional(),
+    skipZk: z.boolean().optional(),
+    timeout: z.number().positive().optional(),
+    version: z.string().optional(),
+  }).optional().default({}),
+  versions: z.array(z.string()).optional(),
+});
+
+export const formatBodySchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  options: z.object({
+    timeout: z.number().positive().optional(),
+    version: z.string().optional(),
+  }).optional().default({}),
+  versions: z.array(z.string()).optional(),
+});
+
+export const analyzeBodySchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  mode: z.enum(["fast", "deep"]).optional().default("fast"),
+  versions: z.array(z.string()).optional(),
+});
+
+export const diffBodySchema = z.object({
+  before: z.string().min(1, "'before' code is required"),
+  after: z.string().min(1, "'after' code is required"),
+});

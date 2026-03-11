@@ -1,0 +1,24 @@
+pragma language_version >= 0.21;
+
+import CompactStandardLibrary;
+
+export ledger totalSupply: Uint<64>;
+export ledger balances: Map<Bytes<32>, Uint<64>>;
+
+export circuit mint(to: Bytes<32>, amount: Uint<64>): [] {
+  const current = balances.lookup(to) as Uint<64>;
+  balances.insert(to, (current + amount) as Uint<64>);
+  totalSupply = (totalSupply + amount) as Uint<64>;
+}
+
+export circuit transfer(from: Bytes<32>, to: Bytes<32>, amount: Uint<64>): [] {
+  const fromBalance = balances.lookup(from) as Uint<64>;
+  assert(fromBalance >= amount, "Insufficient balance");
+  balances.insert(from, (fromBalance - amount) as Uint<64>);
+  const toBalance = balances.lookup(to) as Uint<64>;
+  balances.insert(to, (toBalance + amount) as Uint<64>);
+}
+
+export circuit getBalance(account: Bytes<32>): Uint<64> {
+  return balances.lookup(account) as Uint<64>;
+}
