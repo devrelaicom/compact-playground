@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { compile } from "../compiler.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
+import { compileBodySchema } from "../request-schemas.js";
 
 const compileRoutes = new Hono();
 
@@ -13,16 +14,19 @@ compileRoutes.post("/compile", async (c) => {
     );
   }
 
+  const parsed = compileBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
+      400
+    );
+  }
+
+  const { code, options, versions } = parsed.data;
+
   try {
-    const body = await c.req.json();
-    const { code, options = {}, versions } = body;
-
-    if (!code || typeof code !== "string") {
-      return c.json({ success: false, error: "Invalid request", message: "Code is required and must be a string" }, 400);
-    }
-
     // Multi-version: compile against each version
-    if (versions && Array.isArray(versions) && versions.length > 0) {
+    if (versions && versions.length > 0) {
       const results = await runMultiVersion(versions, code, (version) =>
         compile(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>
       );

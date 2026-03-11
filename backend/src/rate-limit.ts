@@ -32,14 +32,49 @@ export function checkRateLimit(ip: string): boolean {
 }
 
 /**
- * Extracts client IP from request headers.
- * Takes the first IP from x-forwarded-for (client IP before proxies),
- * falls back to x-real-ip, then "unknown".
+ * Best-effort extraction of the runtime-provided client IP from the
+ * server/platform context. With @hono/node-server this is available
+ * via c.env.incoming.socket.remoteAddress. Other adapters may differ,
+ * so this is defensive and returns null when unavailable.
+ */
+function getRuntimeIp(c: Context): string | null {
+  const addr = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)
+    ?.incoming?.socket?.remoteAddress;
+
+  if (typeof addr === "string" && addr.trim()) {
+    return addr.trim();
+  }
+
+  return null;
+}
+
+/**
+ * Extracts client IP from request based on trust configuration.
+ *
+ * Precedence:
+ * 1. TRUST_CLOUDFLARE=true → CF-Connecting-IP (set by Cloudflare, not spoofable)
+ * 2. TRUST_PROXY=true → x-forwarded-for / x-real-ip (only safe behind a trusted reverse proxy)
+ * 3. Runtime/platform-provided client IP (e.g. Node socket remoteAddress)
+ * 4. "unknown" (safe final fallback)
  */
 export function getClientIp(c: Context): string {
-  const xff = c.req.header("x-forwarded-for");
-  if (xff) {
-    return xff.split(",")[0].trim();
+  const config = getConfig();
+
+  if (config.trustCloudflare) {
+    const cfIp = c.req.header("cf-connecting-ip");
+    if (cfIp) return cfIp.trim();
   }
-  return c.req.header("x-real-ip") || "unknown";
+
+  if (config.trustProxy) {
+    const xff = c.req.header("x-forwarded-for");
+    if (xff) return xff.split(",")[0].trim();
+
+    const realIp = c.req.header("x-real-ip");
+    if (realIp) return realIp.trim();
+  }
+
+  const runtimeIp = getRuntimeIp(c);
+  if (runtimeIp) return runtimeIp;
+
+  return "unknown";
 }

@@ -17,8 +17,10 @@ export async function validateRequestBody(c: Context, next: Next) {
   try {
     body = await c.req.json();
   } catch {
-    // Let the route handler deal with JSON parse errors
-    return next();
+    return c.json(
+      { success: false, error: "Invalid JSON", message: "Request body must be valid JSON" },
+      400
+    );
   }
 
   // Check code size

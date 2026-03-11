@@ -3,10 +3,9 @@ import { mkdir, writeFile, readFile, rm } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "./config.js";
-import { getDefaultVersion, ensureVersion } from "./version-manager.js";
+import { getDefaultVersion, prepareVersionDir } from "./version-manager.js";
 
 export interface FormatOptions {
-  diff?: boolean;
   timeout?: number;
   version?: string;
 }
@@ -43,15 +42,18 @@ export async function formatCode(
     // Resolve the version to use (explicit or default)
     const version = options.version || (await getDefaultVersion());
 
-    // Ensure the version is installed (cached across requests)
+    // Set up an isolated --directory for this version. compact update is used
+    // to select the version within the directory; it does not download if the
+    // version is already installed globally. The result is cached so subsequent
+    // requests skip the update call entirely.
     let versionDir: string | null = null;
     if (version) {
       try {
-        versionDir = await ensureVersion(version);
+        versionDir = await prepareVersionDir(version);
       } catch (err) {
         return {
           success: false,
-          error: `Failed to ensure version ${version}: ${err instanceof Error ? err.message : String(err)}`,
+          error: `Version ${version} is not available: ${err instanceof Error ? err.message : String(err)}`,
         };
       }
     }
@@ -114,16 +116,20 @@ function runFormatter(
     proc.stdout.on("data", (data) => (stdout += data.toString()));
     proc.stderr.on("data", (data) => (stderr += data.toString()));
 
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
     const timeoutId = setTimeout(() => {
       if (!settled) {
         settled = true;
         proc.kill("SIGTERM");
+        // Escalate to SIGKILL if the process doesn't exit within 2 seconds
+        killTimer = setTimeout(() => proc.kill("SIGKILL"), 2000);
         reject(new Error("Formatting timed out"));
       }
     }, timeout);
 
     proc.on("close", (code) => {
       clearTimeout(timeoutId);
+      if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
         resolve({ exitCode: code ?? 1, stdout, stderr });
@@ -132,6 +138,7 @@ function runFormatter(
 
     proc.on("error", (error) => {
       clearTimeout(timeoutId);
+      if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {

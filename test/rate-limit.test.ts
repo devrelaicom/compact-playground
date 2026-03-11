@@ -2,38 +2,132 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { getClientIp, checkRateLimit } from "../backend/src/rate-limit.js";
 import { resetConfig } from "../backend/src/config.js";
 
-function mockContext(headers: Record<string, string> = {}) {
+function mockContext(
+  headers: Record<string, string> = {},
+  env?: Record<string, unknown>
+) {
   return {
     req: {
       header: (name: string) => headers[name.toLowerCase()] ?? undefined,
     },
+    env: env ?? {},
   } as any;
 }
 
 describe("getClientIp", () => {
-  it("returns single x-forwarded-for value", () => {
-    const c = mockContext({ "x-forwarded-for": "1.2.3.4" });
-    expect(getClientIp(c)).toBe("1.2.3.4");
+  afterEach(() => {
+    delete process.env.TRUST_PROXY;
+    delete process.env.TRUST_CLOUDFLARE;
+    resetConfig();
   });
 
-  it("returns first IP from comma-separated x-forwarded-for", () => {
-    const c = mockContext({ "x-forwarded-for": "1.2.3.4, 10.0.0.1, 192.168.1.1" });
-    expect(getClientIp(c)).toBe("1.2.3.4");
+  describe("with TRUST_PROXY=true", () => {
+    beforeEach(() => {
+      process.env.TRUST_PROXY = "true";
+      resetConfig();
+    });
+
+    it("returns single x-forwarded-for value", () => {
+      const c = mockContext({ "x-forwarded-for": "1.2.3.4" });
+      expect(getClientIp(c)).toBe("1.2.3.4");
+    });
+
+    it("returns first IP from comma-separated x-forwarded-for", () => {
+      const c = mockContext({ "x-forwarded-for": "1.2.3.4, 10.0.0.1, 192.168.1.1" });
+      expect(getClientIp(c)).toBe("1.2.3.4");
+    });
+
+    it("trims whitespace from extracted IP", () => {
+      const c = mockContext({ "x-forwarded-for": "  1.2.3.4 , 10.0.0.1" });
+      expect(getClientIp(c)).toBe("1.2.3.4");
+    });
+
+    it("falls back to x-real-ip when x-forwarded-for is absent", () => {
+      const c = mockContext({ "x-real-ip": "5.6.7.8" });
+      expect(getClientIp(c)).toBe("5.6.7.8");
+    });
+
+    it("returns 'unknown' when no IP headers present", () => {
+      const c = mockContext({});
+      expect(getClientIp(c)).toBe("unknown");
+    });
   });
 
-  it("trims whitespace from extracted IP", () => {
-    const c = mockContext({ "x-forwarded-for": "  1.2.3.4 , 10.0.0.1" });
-    expect(getClientIp(c)).toBe("1.2.3.4");
+  describe("with TRUST_CLOUDFLARE=true", () => {
+    beforeEach(() => {
+      process.env.TRUST_CLOUDFLARE = "true";
+      resetConfig();
+    });
+
+    it("reads cf-connecting-ip", () => {
+      const c = mockContext({ "cf-connecting-ip": "9.8.7.6" });
+      expect(getClientIp(c)).toBe("9.8.7.6");
+    });
+
+    it("ignores x-forwarded-for when TRUST_PROXY is not set", () => {
+      // No runtime IP either, so falls through to "unknown"
+      const c = mockContext({ "x-forwarded-for": "1.2.3.4" });
+      expect(getClientIp(c)).toBe("unknown");
+    });
+
+    it("prefers cf-connecting-ip over x-forwarded-for when both trusted", () => {
+      process.env.TRUST_PROXY = "true";
+      resetConfig();
+      const c = mockContext({
+        "cf-connecting-ip": "9.8.7.6",
+        "x-forwarded-for": "1.2.3.4",
+      });
+      expect(getClientIp(c)).toBe("9.8.7.6");
+    });
   });
 
-  it("falls back to x-real-ip when x-forwarded-for is absent", () => {
-    const c = mockContext({ "x-real-ip": "5.6.7.8" });
-    expect(getClientIp(c)).toBe("5.6.7.8");
-  });
+  describe("with no trust flags (default)", () => {
+    beforeEach(() => {
+      resetConfig();
+    });
 
-  it("returns 'unknown' when no IP headers present", () => {
-    const c = mockContext({});
-    expect(getClientIp(c)).toBe("unknown");
+    it("ignores all forwarding headers and falls back to runtime IP", () => {
+      const c = mockContext(
+        {
+          "x-forwarded-for": "1.2.3.4",
+          "x-real-ip": "5.6.7.8",
+          "cf-connecting-ip": "9.8.7.6",
+        },
+        { incoming: { socket: { remoteAddress: "10.0.0.1" } } }
+      );
+      expect(getClientIp(c)).toBe("10.0.0.1");
+    });
+
+    it("uses runtime IP when present", () => {
+      const c = mockContext(
+        {},
+        { incoming: { socket: { remoteAddress: "192.168.1.50" } } }
+      );
+      expect(getClientIp(c)).toBe("192.168.1.50");
+    });
+
+    it("trims runtime IP whitespace", () => {
+      const c = mockContext(
+        {},
+        { incoming: { socket: { remoteAddress: "  10.0.0.1  " } } }
+      );
+      expect(getClientIp(c)).toBe("10.0.0.1");
+    });
+
+    it("returns 'unknown' when runtime IP is not available", () => {
+      const c = mockContext({});
+      expect(getClientIp(c)).toBe("unknown");
+    });
+
+    it("returns 'unknown' when env.incoming is missing", () => {
+      const c = mockContext({}, { incoming: undefined });
+      expect(getClientIp(c)).toBe("unknown");
+    });
+
+    it("returns 'unknown' when remoteAddress is empty string", () => {
+      const c = mockContext({}, { incoming: { socket: { remoteAddress: "" } } });
+      expect(getClientIp(c)).toBe("unknown");
+    });
   });
 });
 

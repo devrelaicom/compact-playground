@@ -3,6 +3,7 @@ import { analyzeSource } from "../analyzer.js";
 import { compile } from "../compiler.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
+import { analyzeBodySchema } from "../request-schemas.js";
 
 const analyzeRoutes = new Hono();
 
@@ -11,14 +12,17 @@ analyzeRoutes.post("/analyze", async (c) => {
     return c.json({ success: false, error: "Rate limit exceeded" }, 429);
   }
 
+  const parsed = analyzeBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
+      400
+    );
+  }
+
+  const { code, mode, versions } = parsed.data;
+
   try {
-    const body = await c.req.json();
-    const { code, mode = "fast", versions } = body;
-
-    if (!code || typeof code !== "string") {
-      return c.json({ success: false, error: "Code is required and must be a string" }, 400);
-    }
-
     if (mode === "fast") {
       const analysis = analyzeSource(code);
       return c.json({ success: true, mode: "fast", ...analysis });
@@ -28,7 +32,7 @@ analyzeRoutes.post("/analyze", async (c) => {
       const analysis = analyzeSource(code);
 
       // Multi-version deep analysis
-      if (versions && Array.isArray(versions) && versions.length > 0) {
+      if (versions && versions.length > 0) {
         const compilations = await runMultiVersion(versions, code, async (version) => {
           const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
           return {

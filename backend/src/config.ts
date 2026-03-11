@@ -11,6 +11,8 @@ export interface Config {
   cacheTtl: number;
   maxVersionsPerRequest: number;
   maxCodeSize: number;
+  trustCloudflare: boolean;
+  trustProxy: boolean;
 }
 
 let _config: Config | null = null;
@@ -31,6 +33,8 @@ export function getConfig(): Config {
     cacheTtl: parseInt(process.env.CACHE_TTL || "3600000", 10), // 1 hour
     maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "10", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
+    trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",
+    trustProxy: process.env.TRUST_PROXY === "true",
   };
 
   return _config;

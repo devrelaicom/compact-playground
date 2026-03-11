@@ -99,12 +99,16 @@ export async function listInstalledVersions(): Promise<string[]> {
 export async function getDefaultVersion(): Promise<string | null> {
   const config = getConfig();
   const requested = config.defaultCompilerVersion;
+  const installed = await listInstalledVersions();
 
   if (requested !== "latest" && isValidVersion(requested)) {
+    if (!installed.includes(requested)) {
+      console.warn(`Configured default version ${requested} is not installed, falling back to latest`);
+      return resolveVersion("latest", installed);
+    }
     return requested;
   }
 
-  const installed = await listInstalledVersions();
   return resolveVersion("latest", installed);
 }
 
@@ -275,6 +279,14 @@ export async function resolveRequestedVersion(version: string, code: string): Pr
     );
   }
 
+  // Verify the version is actually installed
+  const installed = await listInstalledVersions();
+  if (!installed.includes(version)) {
+    throw new Error(
+      `Version ${version} is not installed. Available versions: ${installed.join(", ") || "none"}`
+    );
+  }
+
   return version;
 }
 
@@ -287,13 +299,18 @@ export function resetLanguageVersionCache(): void {
 // Cache of versions that have been ensured (installed to their isolated directory)
 const ensuredVersions = new Set<string>();
 
+// In-flight install promises to prevent concurrent installs of the same version
+const inFlightInstalls = new Map<string, Promise<string>>();
+
 /**
- * Ensures a specific compiler version is installed and available.
- * Uses `compact update VERSION --directory DIR` to install to an isolated directory.
- * The --directory flag ensures version state is isolated per version.
+ * Prepares an isolated --directory for a specific compiler version.
+ * Runs `compact update VERSION --directory DIR` to select the version;
+ * this is a local operation when the version is already installed globally.
+ * Results are cached so subsequent calls return immediately.
+ * Deduplicates concurrent requests for the same version.
  * Returns the directory path for the version.
  */
-export async function ensureVersion(version: string): Promise<string> {
+export async function prepareVersionDir(version: string): Promise<string> {
   const config = getConfig();
   const versionDir = join(config.tempDir, `compact-versions`, version);
 
@@ -301,6 +318,21 @@ export async function ensureVersion(version: string): Promise<string> {
     return versionDir;
   }
 
+  // Dedupe concurrent installs of the same version
+  const existing = inFlightInstalls.get(version);
+  if (existing) {
+    return existing;
+  }
+
+  const installPromise = doInstall(version, versionDir, config).finally(() => {
+    inFlightInstalls.delete(version);
+  });
+
+  inFlightInstalls.set(version, installPromise);
+  return installPromise;
+}
+
+async function doInstall(version: string, versionDir: string, config: ReturnType<typeof getConfig>): Promise<string> {
   await mkdir(versionDir, { recursive: true });
 
   return new Promise((resolve, reject) => {
@@ -328,6 +360,6 @@ export async function ensureVersion(version: string): Promise<string> {
 }
 
 /** Reset ensured versions cache (for testing) */
-export function resetEnsuredVersions(): void {
+export function resetPreparedVersionDirs(): void {
   ensuredVersions.clear();
 }

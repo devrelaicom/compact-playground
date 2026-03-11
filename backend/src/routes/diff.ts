@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { diffContracts } from "../differ.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
+import { diffBodySchema } from "../request-schemas.js";
 
 const diffRoutes = new Hono();
 
@@ -9,17 +10,17 @@ diffRoutes.post("/diff", async (c) => {
     return c.json({ success: false, error: "Rate limit exceeded" }, 429);
   }
 
+  const parsed = diffBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
+      400
+    );
+  }
+
+  const { before, after } = parsed.data;
+
   try {
-    const body = await c.req.json();
-    const { before, after } = body;
-
-    if (!before || typeof before !== "string") {
-      return c.json({ success: false, error: "'before' code is required" }, 400);
-    }
-    if (!after || typeof after !== "string") {
-      return c.json({ success: false, error: "'after' code is required" }, 400);
-    }
-
     const result = diffContracts(before, after);
     return c.json({ success: true, ...result });
   } catch (error) {

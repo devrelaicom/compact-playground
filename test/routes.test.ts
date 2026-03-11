@@ -26,6 +26,13 @@ vi.mock("../backend/src/utils.js", () => ({
   getCompilerVersion: vi.fn(),
 }));
 
+vi.mock("../backend/src/config.js", () => ({
+  getConfig: vi.fn(() => ({
+    defaultCompilerVersion: "latest",
+  })),
+  resetConfig: vi.fn(),
+}));
+
 vi.mock("../backend/src/version-manager.js", () => ({
   listInstalledVersions: vi.fn(),
   buildLanguageVersionMap: vi.fn(),
@@ -43,8 +50,11 @@ import { analyzeSource } from "../backend/src/analyzer.js";
 import { diffContracts } from "../backend/src/differ.js";
 import { checkRateLimit, getClientIp } from "../backend/src/rate-limit.js";
 import { getCompilerVersion } from "../backend/src/utils.js";
-import { listInstalledVersions, buildLanguageVersionMap, resolveVersion } from "../backend/src/version-manager.js";
+import { getConfig } from "../backend/src/config.js";
+import { listInstalledVersions, buildLanguageVersionMap, resolveVersion, getDefaultVersion } from "../backend/src/version-manager.js";
 import { runMultiVersion } from "../backend/src/middleware.js";
+
+const mockGetConfig = getConfig as ReturnType<typeof vi.fn>;
 
 import { compileRoutes } from "../backend/src/routes/compile.js";
 import { formatRoutes } from "../backend/src/routes/format.js";
@@ -63,6 +73,7 @@ const mockListInstalledVersions = listInstalledVersions as ReturnType<typeof vi.
 const mockBuildLanguageVersionMap = buildLanguageVersionMap as ReturnType<typeof vi.fn>;
 const mockResolveVersion = resolveVersion as ReturnType<typeof vi.fn>;
 const mockRunMultiVersion = runMultiVersion as ReturnType<typeof vi.fn>;
+const mockGetDefaultVersion = getDefaultVersion as ReturnType<typeof vi.fn>;
 
 function createApp() {
   const app = new Hono();
@@ -101,7 +112,7 @@ describe("POST /compile", () => {
     expect(mockCompile).toHaveBeenCalledWith("export circuit test(): [] {}", {});
   });
 
-  it("missing code → 400 'Code is required and must be a string'", async () => {
+  it("missing code → 400 with validation error", async () => {
     const res = await app.request("/compile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,7 +122,7 @@ describe("POST /compile", () => {
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(false);
-    expect(body.message).toBe("Code is required and must be a string");
+    expect(body.error).toBe("Invalid request");
   });
 
   it("rate limited → 429 'Rate limit exceeded'", async () => {
@@ -251,7 +262,7 @@ describe("POST /analyze", () => {
     expect(mockCompile).toHaveBeenCalled();
   });
 
-  it("invalid mode → 400 'Invalid mode'", async () => {
+  it("invalid mode → 400 with validation error", async () => {
     const res = await app.request("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -261,7 +272,7 @@ describe("POST /analyze", () => {
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(false);
-    expect(body.error).toContain("Invalid mode");
+    expect(body.error).toBe("Invalid request");
   });
 
   it("missing code → 400", async () => {
@@ -302,7 +313,7 @@ describe("POST /diff", () => {
     expect(body.success).toBe(true);
   });
 
-  it("missing before → 400 \"'before' code is required\"", async () => {
+  it("missing before → 400 with validation error", async () => {
     const res = await app.request("/diff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -312,10 +323,10 @@ describe("POST /diff", () => {
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(false);
-    expect(body.error).toBe("'before' code is required");
+    expect(body.error).toBe("Invalid request");
   });
 
-  it("missing after → 400 \"'after' code is required\"", async () => {
+  it("missing after → 400 with validation error", async () => {
     const res = await app.request("/diff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -325,7 +336,7 @@ describe("POST /diff", () => {
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(false);
-    expect(body.error).toBe("'after' code is required");
+    expect(body.error).toBe("Invalid request");
   });
 
   it("rate limited → 429", async () => {
@@ -349,11 +360,14 @@ describe("GET /health", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockGetConfig.mockReturnValue({ defaultCompilerVersion: "latest" });
     app = createApp();
   });
 
-  it("returns status, compactCli, timestamp", async () => {
+  it("returns status, compactCli, defaultVersion, timestamp", async () => {
     mockGetCompilerVersion.mockResolvedValue("0.29.0");
+    mockListInstalledVersions.mockResolvedValue(["0.29.0", "0.28.0"]);
+    mockGetDefaultVersion.mockResolvedValue("0.29.0");
 
     const res = await app.request("/health", { method: "GET" });
 
@@ -364,6 +378,7 @@ describe("GET /health", () => {
     const compactCli = body.compactCli as Record<string, unknown>;
     expect(compactCli.installed).toBe(true);
     expect(compactCli.version).toBe("0.29.0");
+    expect(body.defaultVersion).toBeDefined();
     expect(body.timestamp).toBeDefined();
   });
 });

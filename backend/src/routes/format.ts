@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { formatCode } from "../formatter.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
+import { formatBodySchema } from "../request-schemas.js";
 
 const formatRoutes = new Hono();
 
@@ -10,16 +11,19 @@ formatRoutes.post("/format", async (c) => {
     return c.json({ success: false, error: "Rate limit exceeded" }, 429);
   }
 
+  const parsed = formatBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
+      400
+    );
+  }
+
+  const { code, options, versions } = parsed.data;
+
   try {
-    const body = await c.req.json();
-    const { code, options = {}, versions } = body;
-
-    if (!code || typeof code !== "string") {
-      return c.json({ success: false, error: "Code is required and must be a string" }, 400);
-    }
-
     // Multi-version: format with each version
-    if (versions && Array.isArray(versions) && versions.length > 0) {
+    if (versions && versions.length > 0) {
       const results = await runMultiVersion(versions, code, (version) =>
         formatCode(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>
       );

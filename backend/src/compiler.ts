@@ -225,16 +225,20 @@ async function runCompiler(
       stderr += data.toString();
     });
 
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
     const timeoutId = setTimeout(() => {
       if (!settled) {
         settled = true;
         proc.kill("SIGTERM");
+        // Escalate to SIGKILL if the process doesn't exit within 2 seconds
+        killTimer = setTimeout(() => proc.kill("SIGKILL"), 2000);
         reject(new Error("Compilation timed out"));
       }
     }, timeout);
 
     proc.on("close", (code) => {
       clearTimeout(timeoutId);
+      if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
         resolve({
@@ -247,6 +251,7 @@ async function runCompiler(
 
     proc.on("error", (error) => {
       clearTimeout(timeoutId);
+      if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
