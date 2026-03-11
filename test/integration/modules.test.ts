@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { analyzeSource } from "../../backend/src/analyzer.js";
 import { diffContracts } from "../../backend/src/differ.js";
-import { CompileCache, generateCacheKey, normalizeForCacheKey } from "../../backend/src/cache.js";
-import { resolveVersion, compareVersions, isValidVersion } from "../../backend/src/version-manager.js";
+import { CompileCache, generateCacheKey } from "../../backend/src/cache.js";
+import {
+  resolveVersion,
+  compareVersions,
+  isValidVersion,
+} from "../../backend/src/version-manager.js";
 import { formatCode } from "../../backend/src/formatter.js";
 
 describe("Integration: Analyze → Diff pipeline", () => {
@@ -126,7 +130,11 @@ describe("Integration: Cache with real compile keys", () => {
     expect(cache.get(key)).toBeUndefined();
 
     // Store result
-    const result = { success: true, output: "Compilation successful", compiledAt: new Date().toISOString() };
+    const result = {
+      success: true,
+      output: "Compilation successful",
+      compiledAt: new Date().toISOString(),
+    };
     cache.set(key, result);
 
     // Cache hit
@@ -225,7 +233,7 @@ describe("Integration: Format endpoint", () => {
     expect(result.success).toBe(true);
     if (result.changed) {
       expect(result.diff).toBeDefined();
-      expect(result.diff!.length).toBeGreaterThan(0);
+      expect(result.diff?.length).toBeGreaterThan(0);
     }
   });
 

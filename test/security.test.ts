@@ -23,7 +23,7 @@ vi.mock("../backend/src/rate-limit.js", () => ({
 }));
 
 vi.mock("../backend/src/middleware.js", async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     // Keep the real validateRequestBody
@@ -66,7 +66,7 @@ describe("malformed JSON handling", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid JSON");
   });
@@ -79,7 +79,7 @@ describe("malformed JSON handling", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid JSON");
   });
@@ -92,7 +92,7 @@ describe("malformed JSON handling", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid JSON");
   });
@@ -105,7 +105,7 @@ describe("malformed JSON handling", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid JSON");
   });

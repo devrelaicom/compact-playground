@@ -18,10 +18,7 @@ export interface FormatResult {
   error?: string;
 }
 
-export async function formatCode(
-  code: string,
-  options: FormatOptions = {}
-): Promise<FormatResult> {
+export async function formatCode(code: string, options: FormatOptions = {}): Promise<FormatResult> {
   if (!code || !code.trim()) {
     return { success: false, error: "No code to format" };
   }
@@ -63,11 +60,7 @@ export async function formatCode(
       ? ["format", "--directory", versionDir, sourceFile]
       : ["format", sourceFile];
 
-    const result = await runFormatter(
-      compactCli,
-      formatArgs,
-      options.timeout || 10000
-    );
+    const result = await runFormatter(compactCli, formatArgs, options.timeout || 10000);
 
     if (result.exitCode !== 0) {
       return {
@@ -102,7 +95,7 @@ export async function formatCode(
 function runFormatter(
   path: string,
   args: string[],
-  timeout: number
+  timeout: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(path, args, {
@@ -113,8 +106,8 @@ function runFormatter(
     let stderr = "";
     let settled = false;
 
-    proc.stdout.on("data", (data) => (stdout += data.toString()));
-    proc.stderr.on("data", (data) => (stderr += data.toString()));
+    proc.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
+    proc.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
 
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     const timeoutId = setTimeout(() => {
@@ -159,16 +152,16 @@ function generateSimpleDiff(original: string, formatted: string): string {
 
   const maxLen = Math.max(origLines.length, fmtLines.length);
   for (let i = 0; i < maxLen; i++) {
-    const orig = origLines[i];
-    const fmt = fmtLines[i];
+    const hasOrig = i < origLines.length;
+    const hasFmt = i < fmtLines.length;
 
-    if (orig === undefined) {
-      diff.push(`+ ${fmt}`);
-    } else if (fmt === undefined) {
-      diff.push(`- ${orig}`);
-    } else if (orig !== fmt) {
-      diff.push(`- ${orig}`);
-      diff.push(`+ ${fmt}`);
+    if (!hasOrig) {
+      diff.push(`+ ${fmtLines[i]}`);
+    } else if (!hasFmt) {
+      diff.push(`- ${origLines[i]}`);
+    } else if (origLines[i] !== fmtLines[i]) {
+      diff.push(`- ${origLines[i]}`);
+      diff.push(`+ ${fmtLines[i]}`);
     }
   }
 

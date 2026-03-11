@@ -51,7 +51,12 @@ import { diffContracts } from "../backend/src/differ.js";
 import { checkRateLimit, getClientIp } from "../backend/src/rate-limit.js";
 import { getCompilerVersion } from "../backend/src/utils.js";
 import { getConfig } from "../backend/src/config.js";
-import { listInstalledVersions, buildLanguageVersionMap, resolveVersion, getDefaultVersion } from "../backend/src/version-manager.js";
+import {
+  listInstalledVersions,
+  buildLanguageVersionMap,
+  resolveVersion,
+  getDefaultVersion,
+} from "../backend/src/version-manager.js";
 import { runMultiVersion } from "../backend/src/middleware.js";
 
 const mockGetConfig = getConfig as ReturnType<typeof vi.fn>;
@@ -96,7 +101,12 @@ describe("POST /compile", () => {
   });
 
   it("valid code → 200, returns compile result", async () => {
-    const compileResult = { success: true, output: "compiled output", compiledAt: "2024-01-01T00:00:00Z", executionTime: 100 };
+    const compileResult = {
+      success: true,
+      output: "compiled output",
+      compiledAt: "2024-01-01T00:00:00Z",
+      executionTime: 100,
+    };
     mockCompile.mockResolvedValue(compileResult);
 
     const res = await app.request("/compile", {
@@ -106,7 +116,7 @@ describe("POST /compile", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.output).toBe("compiled output");
     expect(mockCompile).toHaveBeenCalledWith("export circuit test(): [] {}", {});
@@ -120,7 +130,7 @@ describe("POST /compile", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid request");
   });
@@ -135,7 +145,7 @@ describe("POST /compile", () => {
     });
 
     expect(res.status).toBe(429);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Rate limit exceeded");
   });
@@ -150,11 +160,14 @@ describe("POST /compile", () => {
     const res = await app.request("/compile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "export circuit test(): [] {}", versions: ["0.29.0", "0.28.0"] }),
+      body: JSON.stringify({
+        code: "export circuit test(): [] {}",
+        versions: ["0.29.0", "0.28.0"],
+      }),
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.results).toEqual(multiVersionResults);
     expect(mockRunMultiVersion).toHaveBeenCalled();
@@ -182,7 +195,7 @@ describe("POST /format", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.formatted).toBe("formatted code");
   });
@@ -195,7 +208,7 @@ describe("POST /format", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
   });
 
@@ -209,7 +222,7 @@ describe("POST /format", () => {
     });
 
     expect(res.status).toBe(429);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Rate limit exceeded");
   });
@@ -236,7 +249,7 @@ describe("POST /analyze", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.mode).toBe("fast");
     expect(mockCompile).not.toHaveBeenCalled();
@@ -255,7 +268,7 @@ describe("POST /analyze", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.mode).toBe("deep");
     expect(body.compilation).toBeDefined();
@@ -270,7 +283,7 @@ describe("POST /analyze", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid request");
   });
@@ -283,7 +296,7 @@ describe("POST /analyze", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
   });
 });
@@ -309,7 +322,7 @@ describe("POST /diff", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
   });
 
@@ -321,7 +334,7 @@ describe("POST /diff", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid request");
   });
@@ -334,7 +347,7 @@ describe("POST /diff", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Invalid request");
   });
@@ -349,7 +362,7 @@ describe("POST /diff", () => {
     });
 
     expect(res.status).toBe(429);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Rate limit exceeded");
   });
@@ -372,7 +385,7 @@ describe("GET /health", () => {
     const res = await app.request("/health", { method: "GET" });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.status).toBe("healthy");
     expect(body.compactCli).toBeDefined();
     const compactCli = body.compactCli as Record<string, unknown>;
@@ -394,12 +407,17 @@ describe("GET /versions", () => {
   it("returns default + installed with language versions", async () => {
     mockListInstalledVersions.mockResolvedValue(["0.29.0", "0.28.0"]);
     mockResolveVersion.mockReturnValue("0.29.0");
-    mockBuildLanguageVersionMap.mockResolvedValue(new Map([["0.29.0", "1.0"], ["0.28.0", "0.9"]]));
+    mockBuildLanguageVersionMap.mockResolvedValue(
+      new Map([
+        ["0.29.0", "1.0"],
+        ["0.28.0", "0.9"],
+      ]),
+    );
 
     const res = await app.request("/versions", { method: "GET" });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.default).toBe("0.29.0");
     expect(Array.isArray(body.installed)).toBe(true);
     const installed = body.installed as Array<Record<string, unknown>>;

@@ -16,7 +16,7 @@ analyzeRoutes.post("/analyze", async (c) => {
   if (!parsed.success) {
     return c.json(
       { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
-      400
+      400,
     );
   }
 
@@ -28,50 +28,50 @@ analyzeRoutes.post("/analyze", async (c) => {
       return c.json({ success: true, mode: "fast", ...analysis });
     }
 
-    if (mode === "deep") {
-      const analysis = analyzeSource(code);
+    // mode === "deep" (the only remaining case after Zod validation)
+    const analysis = analyzeSource(code);
 
-      // Multi-version deep analysis
-      if (versions && versions.length > 0) {
-        const compilations = await runMultiVersion(versions, code, async (version) => {
-          const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
-          return {
-            success: result.success,
-            errors: result.errors,
-            warnings: result.warnings,
-            executionTime: result.executionTime,
-          };
-        });
+    // Multi-version deep analysis
+    if (versions && versions.length > 0) {
+      const compilations = await runMultiVersion(versions, code, async (version) => {
+        const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
+        return {
+          success: result.success,
+          errors: result.errors,
+          warnings: result.warnings,
+          executionTime: result.executionTime,
+        };
+      });
 
-        return c.json({
-          success: true,
-          mode: "deep",
-          ...analysis,
-          compilations,
-        });
-      }
-
-      // Single version deep analysis (backward compatible)
-      const compileResult = await compile(code, { wrapWithDefaults: true, skipZk: true });
       return c.json({
         success: true,
         mode: "deep",
         ...analysis,
-        compilation: {
-          success: compileResult.success,
-          errors: compileResult.errors,
-          warnings: compileResult.warnings,
-          executionTime: compileResult.executionTime,
-        },
+        compilations,
       });
     }
 
-    return c.json({ success: false, error: "Invalid mode. Use 'fast' or 'deep'." }, 400);
+    // Single version deep analysis (backward compatible)
+    const compileResult = await compile(code, { wrapWithDefaults: true, skipZk: true });
+    return c.json({
+      success: true,
+      mode: "deep",
+      ...analysis,
+      compilation: {
+        success: compileResult.success,
+        errors: compileResult.errors,
+        warnings: compileResult.warnings,
+        executionTime: compileResult.executionTime,
+      },
+    });
   } catch (error) {
     console.error("Analysis error:", error);
     return c.json(
-      { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" },
-      500
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+      },
+      500,
     );
   }
 });

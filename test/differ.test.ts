@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffContracts, DiffResult } from "../backend/src/differ.js";
+import { diffContracts } from "../backend/src/differ.js";
 
 describe("differ", () => {
   it("detects added circuits", () => {

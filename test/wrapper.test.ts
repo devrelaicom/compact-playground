@@ -67,9 +67,7 @@ export ledger counter: Counter;`;
 export ledger counter: Counter;`;
 
       const wrapped = wrapWithDefaults(code);
-      const importCount = (
-        wrapped.match(/import CompactStandardLibrary/g) || []
-      ).length;
+      const importCount = (wrapped.match(/import CompactStandardLibrary/g) || []).length;
       expect(importCount).toBe(1);
     });
 

@@ -9,8 +9,12 @@ const compileRoutes = new Hono();
 compileRoutes.post("/compile", async (c) => {
   if (!checkRateLimit(getClientIp(c))) {
     return c.json(
-      { success: false, error: "Rate limit exceeded", message: "Too many requests. Please wait a minute before trying again." },
-      429
+      {
+        success: false,
+        error: "Rate limit exceeded",
+        message: "Too many requests. Please wait a minute before trying again.",
+      },
+      429,
     );
   }
 
@@ -18,7 +22,7 @@ compileRoutes.post("/compile", async (c) => {
   if (!parsed.success) {
     return c.json(
       { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
-      400
+      400,
     );
   }
 
@@ -27,8 +31,11 @@ compileRoutes.post("/compile", async (c) => {
   try {
     // Multi-version: compile against each version
     if (versions && versions.length > 0) {
-      const results = await runMultiVersion(versions, code, (version) =>
-        compile(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>
+      const results = await runMultiVersion(
+        versions,
+        code,
+        (version) =>
+          compile(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>,
       );
       return c.json({ success: true, results });
     }
@@ -39,8 +46,12 @@ compileRoutes.post("/compile", async (c) => {
   } catch (error) {
     console.error("Compilation error:", error);
     return c.json(
-      { success: false, error: "Internal server error", message: error instanceof Error ? error.message : "An unknown error occurred" },
-      500
+      {
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "An unknown error occurred",
+      },
+      500,
     );
   }
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCode, FormatResult } from "../backend/src/formatter.js";
+import { formatCode } from "../backend/src/formatter.js";
 
 describe("formatter", () => {
   describe("formatCode", () => {
@@ -21,7 +21,7 @@ describe("formatter", () => {
       expect(result.success).toBe(true);
       if (result.changed) {
         expect(result.diff).toBeDefined();
-        expect(result.diff!.length).toBeGreaterThan(0);
+        expect(result.diff?.length).toBeGreaterThan(0);
       }
     });
 

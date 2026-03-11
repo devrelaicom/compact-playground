@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { Context } from "hono";
 import { getClientIp, checkRateLimit } from "../backend/src/rate-limit.js";
 import { resetConfig } from "../backend/src/config.js";
 
-function mockContext(
-  headers: Record<string, string> = {},
-  env?: Record<string, unknown>
-) {
+function mockContext(headers: Record<string, string> = {}, env?: Record<string, unknown>): Context {
   return {
     req: {
-      header: (name: string) => headers[name.toLowerCase()] ?? undefined,
+      header: (name: string) => headers[name.toLowerCase()] as string | undefined,
     },
     env: env ?? {},
-  } as any;
+  } as unknown as Context;
 }
 
 describe("getClientIp", () => {
@@ -93,24 +91,18 @@ describe("getClientIp", () => {
           "x-real-ip": "5.6.7.8",
           "cf-connecting-ip": "9.8.7.6",
         },
-        { incoming: { socket: { remoteAddress: "10.0.0.1" } } }
+        { incoming: { socket: { remoteAddress: "10.0.0.1" } } },
       );
       expect(getClientIp(c)).toBe("10.0.0.1");
     });
 
     it("uses runtime IP when present", () => {
-      const c = mockContext(
-        {},
-        { incoming: { socket: { remoteAddress: "192.168.1.50" } } }
-      );
+      const c = mockContext({}, { incoming: { socket: { remoteAddress: "192.168.1.50" } } });
       expect(getClientIp(c)).toBe("192.168.1.50");
     });
 
     it("trims runtime IP whitespace", () => {
-      const c = mockContext(
-        {},
-        { incoming: { socket: { remoteAddress: "  10.0.0.1  " } } }
-      );
+      const c = mockContext({}, { incoming: { socket: { remoteAddress: "  10.0.0.1  " } } });
       expect(getClientIp(c)).toBe("10.0.0.1");
     });
 

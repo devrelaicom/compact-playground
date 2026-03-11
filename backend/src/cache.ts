@@ -81,7 +81,7 @@ export function normalizeForCacheKey(code: string): string {
 export function generateCacheKey(
   code: string,
   compilerVersion: string,
-  options: Record<string, unknown>
+  options: Record<string, unknown>,
 ): string {
   const normalized = normalizeForCacheKey(code);
   const payload = JSON.stringify({ code: normalized, version: compilerVersion, options });

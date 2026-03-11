@@ -14,7 +14,7 @@ diffRoutes.post("/diff", async (c) => {
   if (!parsed.success) {
     return c.json(
       { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
-      400
+      400,
     );
   }
 
@@ -26,8 +26,11 @@ diffRoutes.post("/diff", async (c) => {
   } catch (error) {
     console.error("Diff error:", error);
     return c.json(
-      { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" },
-      500
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+      },
+      500,
     );
   }
 });

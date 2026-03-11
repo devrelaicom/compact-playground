@@ -21,7 +21,7 @@ describe("compile", () => {
     const result = await compile("this is not valid compact code");
     expect(result.success).toBe(false);
     expect(result.errors).toBeDefined();
-    expect(result.errors!.length).toBeGreaterThan(0);
+    expect(result.errors?.length).toBeGreaterThan(0);
   }, 60000);
 
   it("wraps code without pragma and reports original/wrapped", async () => {

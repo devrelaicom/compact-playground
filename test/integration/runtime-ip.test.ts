@@ -10,7 +10,7 @@ import { resetConfig } from "../../backend/src/config.js";
  * is populated by the adapter when no trust flags are set.
  */
 describe("Runtime IP via @hono/node-server adapter", () => {
-  let server: ReturnType<typeof serve>;
+  let server: ReturnType<typeof serve> | undefined;
   const port = 9876;
 
   afterAll(() => {
@@ -26,7 +26,7 @@ describe("Runtime IP via @hono/node-server adapter", () => {
     delete process.env.TRUST_CLOUDFLARE;
     resetConfig();
 
-    let capturedIp: string | null = null;
+    let capturedIp = "";
 
     const app = new Hono();
     app.get("/ip-test", (c) => {
@@ -39,8 +39,8 @@ describe("Runtime IP via @hono/node-server adapter", () => {
     // Wait for server to be ready
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const res = await fetch(`http://127.0.0.1:${port}/ip-test`);
-    const body = await res.json() as { ip: string };
+    const res = await fetch(`http://127.0.0.1:${String(port)}/ip-test`);
+    const body = (await res.json()) as { ip: string };
 
     // When connecting via 127.0.0.1, the adapter should provide the loopback address.
     // Node reports this as "::1" (IPv6) or "127.0.0.1" (IPv4) depending on OS/config.
@@ -50,7 +50,7 @@ describe("Runtime IP via @hono/node-server adapter", () => {
 
     // Should be a loopback address
     expect(
-      capturedIp === "127.0.0.1" || capturedIp === "::1" || capturedIp!.startsWith("::ffff:127.")
+      capturedIp === "127.0.0.1" || capturedIp === "::1" || capturedIp.startsWith("::ffff:127."),
     ).toBe(true);
   });
 });

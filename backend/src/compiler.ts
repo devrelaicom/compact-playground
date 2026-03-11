@@ -49,10 +49,7 @@ export interface CompileResult {
 /**
  * Compiles Compact code and returns the result
  */
-export async function compile(
-  code: string,
-  options: CompileOptions = {}
-): Promise<CompileResult> {
+export async function compile(code: string, options: CompileOptions = {}): Promise<CompileResult> {
   const config = getConfig();
   const startTime = Date.now();
   const sessionId = uuidv4();
@@ -68,11 +65,10 @@ export async function compile(
     // Check cache before doing any work
     const cache = getCache();
     const cacheKey = cache
-      ? generateCacheKey(
-          code,
-          compilerVersion || "default",
-          { wrapWithDefaults: options.wrapWithDefaults, skipZk: options.skipZk }
-        )
+      ? generateCacheKey(code, compilerVersion || "default", {
+          wrapWithDefaults: options.wrapWithDefaults,
+          skipZk: options.skipZk,
+        })
       : null;
 
     if (cache && cacheKey) {
@@ -85,8 +81,7 @@ export async function compile(
 
     // Determine if we need to wrap the code
     let finalCode = code;
-    const needsWrapping =
-      options.wrapWithDefaults !== false && !hasPragma(code);
+    const needsWrapping = options.wrapWithDefaults !== false && !hasPragma(code);
 
     if (needsWrapping) {
       // Dynamically resolve language version from the compiler that will be used
@@ -122,10 +117,7 @@ export async function compile(
 
     compileArgs.push(sourceFile, outputDir);
 
-    const result = await runCompiler(
-      compileArgs,
-      options.timeout || config.compileTimeout
-    );
+    const result = await runCompiler(compileArgs, options.timeout || config.compileTimeout);
 
     const executionTime = Date.now() - startTime;
 
@@ -172,7 +164,7 @@ export async function compile(
                   severity: "error",
                 },
               ],
-        output: `Compilation failed with ${errors.length} error(s)`,
+        output: `Compilation failed with ${String(errors.length)} error(s)`,
         compiledAt: new Date().toISOString(),
         originalCode: needsWrapping ? code : undefined,
         wrappedCode: needsWrapping ? finalCode : undefined,
@@ -198,10 +190,7 @@ interface CompilerOutput {
 /**
  * Runs the compact compiler with the given arguments
  */
-async function runCompiler(
-  args: string[],
-  timeout: number
-): Promise<CompilerOutput> {
+async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
   return new Promise((resolve, reject) => {
     const compactCli = getConfig().compactCliPath;
 
@@ -217,11 +206,11 @@ async function runCompiler(
     let stderr = "";
     let settled = false;
 
-    proc.stdout.on("data", (data) => {
+    proc.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 
-    proc.stderr.on("data", (data) => {
+    proc.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
     });
 
@@ -255,11 +244,7 @@ async function runCompiler(
       if (!settled) {
         settled = true;
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(
-            new Error(
-              "Compact CLI not found. Please ensure it is installed and in PATH."
-            )
-          );
+          reject(new Error("Compact CLI not found. Please ensure it is installed and in PATH."));
         } else {
           reject(error);
         }
