@@ -26,7 +26,7 @@ export async function getCompilerVersion(): Promise<string | null> {
 
     let stdout = "";
 
-    proc.stdout.on("data", (data) => {
+    proc.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 

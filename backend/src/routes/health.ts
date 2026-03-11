@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { getCompilerVersion } from "../utils.js";
-import { listInstalledVersions, getDefaultVersion, buildLanguageVersionMap, resolveVersion } from "../version-manager.js";
+import {
+  listInstalledVersions,
+  getDefaultVersion,
+  buildLanguageVersionMap,
+  resolveVersion,
+} from "../version-manager.js";
 import { getConfig } from "../config.js";
 
 const healthRoutes = new Hono();
@@ -15,9 +20,8 @@ healthRoutes.get("/health", async (c) => {
 
   // Check if configured default version is actually available
   const configuredDefault = config.defaultCompilerVersion;
-  const defaultVersionValid = configuredDefault === "latest"
-    ? installed.length > 0
-    : installed.includes(configuredDefault);
+  const defaultVersionValid =
+    configuredDefault === "latest" ? installed.length > 0 : installed.includes(configuredDefault);
 
   return c.json({
     status: cliInstalled && defaultVersionValid ? "healthy" : "degraded",

@@ -28,12 +28,10 @@ export function parseCompilerErrors(output: string): CompilerError[] {
   const lines = output.split("\n");
 
   // Regex patterns for different error formats
-  const exceptionPattern =
-    /Exception:\s*(\S+)\s+line\s+(\d+)\s+char\s+(\d+):/i;
+  const exceptionPattern = /Exception:\s*(\S+)\s+line\s+(\d+)\s+char\s+(\d+):/i;
   const simpleErrorPattern = /^(Error|Warning|Info):\s*(.+)/i;
   const parseErrorPattern = /parse error:\s*(.+)/i;
-  const typeErrorPattern =
-    /expected\s+(.+)\s+to have type\s+(.+)\s+but received\s+(.+)/i;
+  const typeErrorPattern = /expected\s+(.+)\s+to have type\s+(.+)\s+but received\s+(.+)/i;
   const unboundPattern = /unbound identifier\s*"([^"]+)"/i;
 
   let currentError: Partial<CompilerError> | null = null;
@@ -65,10 +63,7 @@ export function parseCompilerErrors(output: string): CompilerError[] {
     // Check for simple error/warning pattern
     const simpleMatch = trimmedLine.match(simpleErrorPattern);
     if (simpleMatch && !currentError) {
-      const severity = simpleMatch[1].toLowerCase() as
-        | "error"
-        | "warning"
-        | "info";
+      const severity = simpleMatch[1].toLowerCase() as "error" | "warning" | "info";
       errors.push({
         message: simpleMatch[2].trim(),
         severity,
@@ -120,7 +115,7 @@ export function parseCompilerErrors(output: string): CompilerError[] {
   // Deduplicate errors
   const seen = new Set<string>();
   return errors.filter((error) => {
-    const key = `${error.line}:${error.column}:${error.message}`;
+    const key = `${String(error.line)}:${String(error.column)}:${error.message}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -133,13 +128,13 @@ export function parseCompilerErrors(output: string): CompilerError[] {
 export function formatErrors(errors: CompilerError[]): string {
   return errors
     .map((error) => {
-      let prefix = error.severity === "warning" ? "Warning" : "Error";
+      const prefix = error.severity === "warning" ? "Warning" : "Error";
       let location = "";
 
       if (error.line !== undefined) {
-        location = ` at line ${error.line}`;
+        location = ` at line ${String(error.line)}`;
         if (error.column !== undefined) {
-          location += `, column ${error.column}`;
+          location += `, column ${String(error.column)}`;
         }
       }
 

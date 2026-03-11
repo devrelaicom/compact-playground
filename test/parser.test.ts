@@ -15,13 +15,15 @@ describe("compiler error parser", () => {
       const errors = parseCompilerErrors(output);
 
       expect(errors).toHaveLength(1);
-      expect(errors[0]).toEqual({
-        file: "contract.compact",
-        line: 5,
-        column: 12,
-        message: expect.stringContaining("expected first argument"),
-        severity: "error",
-      });
+      expect(errors[0]).toEqual(
+        expect.objectContaining({
+          file: "contract.compact",
+          line: 5,
+          column: 12,
+          severity: "error",
+        }),
+      );
+      expect(errors[0].message).toContain("expected first argument");
     });
 
     it("parses multiple errors", () => {

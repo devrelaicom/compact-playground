@@ -45,8 +45,7 @@ export function analyzeSource(code: string): AnalysisResult {
   }
 
   // Extract circuits
-  const circuitRegex =
-    /^(\s*)(export\s+)?(pure\s+)?circuit\s+(\w+)\s*\(([^)]*)\)\s*:\s*([^{]+)/gm;
+  const circuitRegex = /^(\s*)(export\s+)?(pure\s+)?circuit\s+(\w+)\s*\(([^)]*)\)\s*:\s*([^{]+)/gm;
   let circuitMatch;
   while ((circuitMatch = circuitRegex.exec(code)) !== null) {
     const exported = !!circuitMatch[2];

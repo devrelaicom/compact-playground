@@ -33,10 +33,7 @@ export function compareVersions(a: string, b: string): number {
   return va.patch - vb.patch;
 }
 
-export function resolveVersion(
-  requested: string,
-  installedVersions: string[]
-): string | null {
+export function resolveVersion(requested: string, installedVersions: string[]): string | null {
   if (installedVersions.length === 0) return null;
 
   if (requested === "latest") {
@@ -60,7 +57,10 @@ const INSTALLED_VERSIONS_TTL = 30_000; // 30 seconds
  * or by scanning the compact directory. Results are cached for 30 seconds.
  */
 export async function listInstalledVersions(): Promise<string[]> {
-  if (installedVersionsCache && Date.now() - installedVersionsCache.timestamp < INSTALLED_VERSIONS_TTL) {
+  if (
+    installedVersionsCache &&
+    Date.now() - installedVersionsCache.timestamp < INSTALLED_VERSIONS_TTL
+  ) {
     return installedVersionsCache.versions;
   }
 
@@ -69,7 +69,7 @@ export async function listInstalledVersions(): Promise<string[]> {
     const proc = spawn(compactCli, ["list", "--installed"], { timeout: 5000 });
 
     let stdout = "";
-    proc.stdout.on("data", (data) => (stdout += data.toString()));
+    proc.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
 
     proc.on("close", (code) => {
       if (code === 0 && stdout.trim()) {
@@ -89,7 +89,9 @@ export async function listInstalledVersions(): Promise<string[]> {
       }
     });
 
-    proc.on("error", () => resolve([]));
+    proc.on("error", () => {
+      resolve([]);
+    });
   });
 }
 
@@ -103,7 +105,9 @@ export async function getDefaultVersion(): Promise<string | null> {
 
   if (requested !== "latest" && isValidVersion(requested)) {
     if (!installed.includes(requested)) {
-      console.warn(`Configured default version ${requested} is not installed, falling back to latest`);
+      console.warn(
+        `Configured default version ${requested} is not installed, falling back to latest`,
+      );
       return resolveVersion("latest", installed);
     }
     return requested;
@@ -145,13 +149,19 @@ export async function getCompilerLanguageVersion(compilerVersion: string): Promi
           .filter((l) => /^\d+\.\d+\.\d+$/.test(l))
           .pop();
         if (!langVersion) {
-          reject(new Error(`Could not parse language version from compiler ${compilerVersion} output: ${stdout.trim()}`));
+          reject(
+            new Error(
+              `Could not parse language version from compiler ${compilerVersion} output: ${stdout.trim()}`,
+            ),
+          );
           return;
         }
         languageVersionCache.set(compilerVersion, langVersion);
         resolve(langVersion);
       } else {
-        reject(new Error(`Failed to get language version for compiler ${compilerVersion}: ${stderr}`));
+        reject(
+          new Error(`Failed to get language version for compiler ${compilerVersion}: ${stderr}`),
+        );
       }
     });
 
@@ -176,7 +186,7 @@ export async function buildLanguageVersionMap(): Promise<Map<string, string>> {
       } catch {
         // Skip versions that fail
       }
-    })
+    }),
   );
 
   return map;
@@ -217,7 +227,10 @@ export async function detectVersionFromPragma(code: string): Promise<string | nu
           ? `${ver}.0`
           : ver
         : `${ver}.0.0`;
-      const cmp = compareVersions(langVersion.split(".").length === 2 ? `${langVersion}.0` : langVersion, target);
+      const cmp = compareVersions(
+        langVersion.split(".").length === 2 ? `${langVersion}.0` : langVersion,
+        target,
+      );
 
       switch (op) {
         case ">=":
@@ -274,16 +287,14 @@ export async function resolveRequestedVersion(version: string, code: string): Pr
   }
 
   if (!isValidVersion(version)) {
-    throw new Error(
-      `Invalid version format: ${version}. Expected semver like "0.29.0"`
-    );
+    throw new Error(`Invalid version format: ${version}. Expected semver like "0.29.0"`);
   }
 
   // Verify the version is actually installed
   const installed = await listInstalledVersions();
   if (!installed.includes(version)) {
     throw new Error(
-      `Version ${version} is not installed. Available versions: ${installed.join(", ") || "none"}`
+      `Version ${version} is not installed. Available versions: ${installed.join(", ") || "none"}`,
     );
   }
 
@@ -332,7 +343,11 @@ export async function prepareVersionDir(version: string): Promise<string> {
   return installPromise;
 }
 
-async function doInstall(version: string, versionDir: string, config: ReturnType<typeof getConfig>): Promise<string> {
+async function doInstall(
+  version: string,
+  versionDir: string,
+  config: ReturnType<typeof getConfig>,
+): Promise<string> {
   await mkdir(versionDir, { recursive: true });
 
   return new Promise((resolve, reject) => {
@@ -342,7 +357,7 @@ async function doInstall(version: string, versionDir: string, config: ReturnType
     });
 
     let stderr = "";
-    proc.stderr.on("data", (data) => (stderr += data.toString()));
+    proc.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
 
     proc.on("close", (code) => {
       if (code === 0) {

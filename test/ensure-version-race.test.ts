@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { EventEmitter } from "events";
 import { prepareVersionDir, resetPreparedVersionDirs } from "../backend/src/version-manager.js";
 import { resetConfig } from "../backend/src/config.js";
 
@@ -8,11 +9,14 @@ import { resetConfig } from "../backend/src/config.js";
 let spawnCallCount = 0;
 
 vi.mock("child_process", () => {
-  const { EventEmitter } = require("events");
   return {
     spawn: vi.fn(() => {
       spawnCallCount++;
-      const proc = new EventEmitter();
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+        kill: ReturnType<typeof vi.fn>;
+      };
       proc.stdout = new EventEmitter();
       proc.stderr = new EventEmitter();
       proc.kill = vi.fn();

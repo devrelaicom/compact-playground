@@ -101,7 +101,7 @@ export function smartWrap(
   options: {
     languageVersion?: string;
     addTestCircuit?: boolean;
-  } = {}
+  } = {},
 ): string {
   const snippetType = detectSnippetType(code);
 

@@ -15,7 +15,7 @@ formatRoutes.post("/format", async (c) => {
   if (!parsed.success) {
     return c.json(
       { success: false, error: "Invalid request", message: parsed.error.issues[0].message },
-      400
+      400,
     );
   }
 
@@ -24,8 +24,11 @@ formatRoutes.post("/format", async (c) => {
   try {
     // Multi-version: format with each version
     if (versions && versions.length > 0) {
-      const results = await runMultiVersion(versions, code, (version) =>
-        formatCode(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>
+      const results = await runMultiVersion(
+        versions,
+        code,
+        (version) =>
+          formatCode(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>,
       );
       return c.json({ success: true, results });
     }
@@ -36,8 +39,11 @@ formatRoutes.post("/format", async (c) => {
   } catch (error) {
     console.error("Format error:", error);
     return c.json(
-      { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" },
-      500
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+      },
+      500,
     );
   }
 });

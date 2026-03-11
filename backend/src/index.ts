@@ -21,7 +21,7 @@ app.use(
     origin: "*",
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type"],
-  })
+  }),
 );
 
 app.use("*", validateRequestBody);
@@ -41,9 +41,10 @@ app.get("/", (c) => {
     version: "2.0.0",
     description: "Compile, format, analyze, and diff Compact smart contracts",
     endpoints: {
-      "POST /compile": "Compile Compact code (versions: [\"latest\", \"detect\", or specific])",
-      "POST /format": "Format Compact code (versions: [\"latest\", \"detect\", or specific])",
-      "POST /analyze": "Analyze contract structure (fast/deep, versions: [\"latest\", \"detect\", or specific])",
+      "POST /compile": 'Compile Compact code (versions: ["latest", "detect", or specific])',
+      "POST /format": 'Format Compact code (versions: ["latest", "detect", or specific])',
+      "POST /analyze":
+        'Analyze contract structure (fast/deep, versions: ["latest", "detect", or specific])',
       "POST /diff": "Semantic diff between contract versions",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
@@ -57,7 +58,7 @@ const port = getConfig().port;
 console.log(`
 ╔═══════════════════════════════════════════════════╗
 ║           Compact Playground API                  ║
-║           Starting on port ${port}                    ║
+║           Starting on port ${String(port)}                    ║
 ╚═══════════════════════════════════════════════════╝
 `);
 
@@ -66,4 +67,4 @@ serve({
   port,
 });
 
-console.log(`Server running at http://localhost:${port}`);
+console.log(`Server running at http://localhost:${String(port)}`);

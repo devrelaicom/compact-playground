@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   parseVersionString,
   isValidVersion,
@@ -63,27 +63,23 @@ describe("version-manager", () => {
 
   describe("resolveRequestedVersion", () => {
     it("rejects path traversal strings", async () => {
-      await expect(
-        resolveRequestedVersion("../../etc/passwd", "")
-      ).rejects.toThrow("Invalid version format");
+      await expect(resolveRequestedVersion("../../etc/passwd", "")).rejects.toThrow(
+        "Invalid version format",
+      );
     });
 
     it("rejects command injection strings", async () => {
-      await expect(
-        resolveRequestedVersion("1.0.0; rm -rf /", "")
-      ).rejects.toThrow("Invalid version format");
+      await expect(resolveRequestedVersion("1.0.0; rm -rf /", "")).rejects.toThrow(
+        "Invalid version format",
+      );
     });
 
     it("rejects empty strings", async () => {
-      await expect(
-        resolveRequestedVersion("", "")
-      ).rejects.toThrow("Invalid version format");
+      await expect(resolveRequestedVersion("", "")).rejects.toThrow("Invalid version format");
     });
 
     it("rejects partial versions", async () => {
-      await expect(
-        resolveRequestedVersion("0.26", "")
-      ).rejects.toThrow("Invalid version format");
+      await expect(resolveRequestedVersion("0.26", "")).rejects.toThrow("Invalid version format");
     });
 
     it("accepts valid semver strings", async () => {

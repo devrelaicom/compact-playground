@@ -4,14 +4,17 @@ import type { Context } from "hono";
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
 // Sweep expired entries every 5 minutes to prevent unbounded growth
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of rateLimitMap) {
-    if (now > record.resetTime) {
-      rateLimitMap.delete(ip);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [ip, record] of rateLimitMap) {
+      if (now > record.resetTime) {
+        rateLimitMap.delete(ip);
+      }
     }
-  }
-}, 5 * 60 * 1000).unref();
+  },
+  5 * 60 * 1000,
+).unref();
 
 export function checkRateLimit(ip: string): boolean {
   const config = getConfig();
