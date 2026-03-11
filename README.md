@@ -236,6 +236,7 @@ curl http://localhost:8080/health
 {
   "status": "healthy",
   "compactCli": {"installed": true, "version": "0.4.0"},
+  "defaultVersion": {"configured": "latest", "resolved": "0.29.0", "valid": true},
   "timestamp": "2026-03-09T14:00:00.000Z"
 }
 ```
@@ -268,6 +269,10 @@ All settings are controlled via environment variables:
 | `CACHE_ENABLED` | `true` | Enable compilation cache |
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries |
 | `CACHE_TTL` | `3600000` | Cache TTL in ms (1 hour) |
+| `MAX_CODE_SIZE` | `102400` | Max code size in bytes (100 KB) |
+| `MAX_VERSIONS_PER_REQUEST` | `10` | Max versions in a multi-version request |
+| `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
+| `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
 
 > **Learn Compact:** Set `DEFAULT_COMPILER_VERSION=0.26.0` to pin the compiler to match `pragma language_version >= 0.16 && <= 0.18` used in the tutorial contracts.
 

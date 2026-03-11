@@ -35,6 +35,11 @@ yarn-error.log*
 *.tmp
 *.temp
 
+# Planning artifacts
+docs/ideas/
+docs/plans/
+docs/superpowers/
+
 # Package manager locks (keep only one)
 # Uncomment the one you're NOT using:
 # package-lock.json
