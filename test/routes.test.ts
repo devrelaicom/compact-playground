@@ -9,8 +9,8 @@ vi.mock("../backend/src/formatter.js", () => ({
   formatCode: vi.fn(),
 }));
 
-vi.mock("../backend/src/analyzer.js", () => ({
-  analyzeSource: vi.fn(),
+vi.mock("../backend/src/analysis/index.js", () => ({
+  analyzeContract: vi.fn(),
 }));
 
 vi.mock("../backend/src/differ.js", () => ({
@@ -46,7 +46,7 @@ vi.mock("../backend/src/middleware.js", () => ({
 
 import { compile } from "../backend/src/compiler.js";
 import { formatCode } from "../backend/src/formatter.js";
-import { analyzeSource } from "../backend/src/analyzer.js";
+import { analyzeContract } from "../backend/src/analysis/index.js";
 import { diffContracts } from "../backend/src/differ.js";
 import { checkRateLimit, getClientIp } from "../backend/src/rate-limit.js";
 import { getCompilerVersion } from "../backend/src/utils.js";
@@ -69,7 +69,7 @@ import { healthRoutes } from "../backend/src/routes/health.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
-const mockAnalyzeSource = analyzeSource as ReturnType<typeof vi.fn>;
+const mockAnalyzeContract = analyzeContract as ReturnType<typeof vi.fn>;
 const mockDiffContracts = diffContracts as ReturnType<typeof vi.fn>;
 const mockCheckRateLimit = checkRateLimit as ReturnType<typeof vi.fn>;
 const mockGetClientIp = getClientIp as ReturnType<typeof vi.fn>;
@@ -238,9 +238,44 @@ describe("POST /analyze", () => {
     app = createApp();
   });
 
-  it("mode=fast → 200, returns analysis (no compile call)", async () => {
-    const analysisResult = { declarations: [], imports: [], exports: [] };
-    mockAnalyzeSource.mockReturnValue(analysisResult);
+  it("mode=fast → 200, returns canonical analysis response", async () => {
+    const analysisResult = {
+      success: true,
+      mode: "fast",
+      diagnostics: [],
+      summary: {
+        hasLedger: false,
+        hasCircuits: true,
+        hasWitnesses: false,
+        totalLines: 1,
+        publicCircuits: 1,
+        privateCircuits: 0,
+        publicState: 0,
+        privateState: 0,
+      },
+      structure: {
+        imports: [],
+        exports: ["test"],
+        ledger: [],
+        circuits: [
+          {
+            name: "test",
+            isPublic: true,
+            isPure: false,
+            parameters: [],
+            returnType: "[]",
+            location: { line: 1, column: 0, offset: 0 },
+          },
+        ],
+        witnesses: [],
+        types: [],
+      },
+      facts: { hasStdLibImport: false, unusedWitnesses: [] },
+      findings: [],
+      recommendations: [],
+      circuits: [],
+    };
+    mockAnalyzeContract.mockResolvedValue(analysisResult);
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -252,14 +287,36 @@ describe("POST /analyze", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.mode).toBe("fast");
-    expect(mockCompile).not.toHaveBeenCalled();
+    expect(body.summary).toBeDefined();
+    expect(body.structure).toBeDefined();
+    expect(body.findings).toBeDefined();
+    expect(body.recommendations).toBeDefined();
   });
 
-  it("mode=deep → 200, returns analysis + compilation", async () => {
-    const analysisResult = { declarations: [], imports: [], exports: [] };
-    mockAnalyzeSource.mockReturnValue(analysisResult);
-    const compileResult = { success: true, errors: [], warnings: [], executionTime: 50 };
-    mockCompile.mockResolvedValue(compileResult);
+  it("mode=deep → 200, returns analysis with compilation", async () => {
+    const analysisResult = {
+      success: true,
+      mode: "deep",
+      diagnostics: [],
+      summary: {
+        hasLedger: false,
+        hasCircuits: true,
+        hasWitnesses: false,
+        totalLines: 1,
+        publicCircuits: 1,
+        privateCircuits: 0,
+        publicState: 0,
+        privateState: 0,
+      },
+      structure: { imports: [], exports: [], ledger: [], circuits: [], witnesses: [], types: [] },
+      facts: { hasStdLibImport: false, unusedWitnesses: [] },
+      findings: [],
+      recommendations: [],
+      circuits: [],
+      compilation: { success: true, diagnostics: [], executionTime: 50 },
+      compiler: { available: true, executionTime: 50 },
+    };
+    mockAnalyzeContract.mockResolvedValue(analysisResult);
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -272,7 +329,6 @@ describe("POST /analyze", () => {
     expect(body.success).toBe(true);
     expect(body.mode).toBe("deep");
     expect(body.compilation).toBeDefined();
-    expect(mockCompile).toHaveBeenCalled();
   });
 
   it("invalid mode → 400 with validation error", async () => {
@@ -298,6 +354,34 @@ describe("POST /analyze", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
+  });
+
+  it("rate limited → 429", async () => {
+    mockCheckRateLimit.mockReturnValue(false);
+
+    const res = await app.request("/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "test", mode: "fast" }),
+    });
+
+    expect(res.status).toBe(429);
+  });
+
+  it("accepts circuit filter parameter", async () => {
+    mockAnalyzeContract.mockResolvedValue({ success: true, mode: "fast", circuits: [] });
+
+    const res = await app.request("/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "test", mode: "fast", circuit: "myCircuit" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockAnalyzeContract).toHaveBeenCalledWith(
+      "test",
+      expect.objectContaining({ circuit: "myCircuit" }),
+    );
   });
 });
 
