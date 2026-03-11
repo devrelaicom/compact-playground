@@ -1,10 +1,11 @@
-import { analyzeSource, type CircuitInfo, type LedgerInfo } from "./analyzer.js";
+import { parseSource } from "./analysis/parser.js";
+import type { ParsedCircuit, ParsedLedgerField } from "./analysis/types.js";
 
 export interface CircuitDiff {
   name: string;
   changes: string[]; // which aspects changed: "params", "returnType", "exported", "pure"
-  before?: CircuitInfo;
-  after?: CircuitInfo;
+  before?: ParsedCircuit;
+  after?: ParsedCircuit;
 }
 
 export interface LedgerDiff {
@@ -16,13 +17,13 @@ export interface LedgerDiff {
 export interface DiffResult {
   hasChanges: boolean;
   circuits: {
-    added: CircuitInfo[];
-    removed: CircuitInfo[];
+    added: ParsedCircuit[];
+    removed: ParsedCircuit[];
     modified: CircuitDiff[];
   };
   ledger: {
-    added: LedgerInfo[];
-    removed: LedgerInfo[];
+    added: ParsedLedgerField[];
+    removed: ParsedLedgerField[];
     modified: LedgerDiff[];
   };
   pragma: {
@@ -37,8 +38,8 @@ export interface DiffResult {
 }
 
 export function diffContracts(before: string, after: string): DiffResult {
-  const beforeAnalysis = analyzeSource(before);
-  const afterAnalysis = analyzeSource(after);
+  const beforeAnalysis = parseSource(before);
+  const afterAnalysis = parseSource(after);
 
   // Diff circuits
   const beforeCircuits = new Map(beforeAnalysis.circuits.map((c) => [c.name, c]));
@@ -53,16 +54,16 @@ export function diffContracts(before: string, after: string): DiffResult {
     if (!afterCircuit) continue;
 
     const changes: string[] = [];
-    if (JSON.stringify(beforeCircuit.params) !== JSON.stringify(afterCircuit.params)) {
+    if (JSON.stringify(beforeCircuit.parameters) !== JSON.stringify(afterCircuit.parameters)) {
       changes.push("params");
     }
     if (beforeCircuit.returnType !== afterCircuit.returnType) {
       changes.push("returnType");
     }
-    if (beforeCircuit.exported !== afterCircuit.exported) {
+    if (beforeCircuit.isExported !== afterCircuit.isExported) {
       changes.push("exported");
     }
-    if (beforeCircuit.pure !== afterCircuit.pure) {
+    if (beforeCircuit.isPure !== afterCircuit.isPure) {
       changes.push("pure");
     }
 
