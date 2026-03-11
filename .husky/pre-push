@@ -1,0 +1,18 @@
+echo "Running pre-push checks..."
+
+echo "=> Lint"
+npm run lint
+
+echo "=> Format"
+npm run format
+
+echo "=> Type check"
+npm run typecheck
+
+echo "=> Tests"
+npm run test:run
+
+echo "=> Audit"
+npm audit --audit-level=moderate
+
+echo "All pre-push checks passed."

@@ -14,7 +14,8 @@
     "format": "prettier --check \"backend/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\"",
     "format:fix": "prettier --write \"backend/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
-    "quality": "npm run lint && npm run format && npm run typecheck && npm run test:run"
+    "quality": "npm run lint && npm run format && npm run typecheck && npm run test:run",
+    "prepare": "husky"
   },
   "lint-staged": {
     "*.ts": [
