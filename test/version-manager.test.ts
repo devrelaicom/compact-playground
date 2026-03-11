@@ -6,7 +6,6 @@ import {
   resolveVersion,
   resolveRequestedVersion,
 } from "../backend/src/version-manager.js";
-import { HAS_COMPACT_CLI } from "./helpers.js";
 
 describe("version-manager", () => {
   describe("parseVersionString", () => {
@@ -83,7 +82,7 @@ describe("version-manager", () => {
       await expect(resolveRequestedVersion("0.26", "")).rejects.toThrow("Invalid version format");
     });
 
-    it.skipIf(!HAS_COMPACT_CLI)("accepts valid semver strings", async () => {
+    it("accepts valid semver strings", async () => {
       const result = await resolveRequestedVersion("0.29.0", "");
       expect(result).toBe("0.29.0");
     });

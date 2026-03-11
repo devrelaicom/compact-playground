@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { compile, resetCompileCache } from "../backend/src/compiler.js";
-import { HAS_COMPACT_CLI } from "./helpers.js";
 
-describe.skipIf(!HAS_COMPACT_CLI)("compile", () => {
+describe("compile", () => {
   beforeEach(() => {
     resetCompileCache();
   });
