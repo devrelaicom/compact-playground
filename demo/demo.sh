@@ -256,9 +256,10 @@ pause
 
 banner "10. Analyze — Fast Mode"
 
-describe "POST /analyze in fast mode extracts contract structure without compilation.
-It finds circuits, ledger fields, imports, and pragma declarations.
-Fast mode is version-independent (source-level analysis only)."
+describe "POST /analyze runs a 5-stage analysis pipeline: parse → semantic model →
+rules → recommendations → circuit explanations. Fast mode is source-level only
+(no compilation). Returns summary, structure, findings, recommendations, and
+per-circuit explanations with ZK implications and privacy considerations."
 
 echo -e "${DIM}Contract: token.compact${RESET}"
 echo -e "${CYAN}$(read_contract token.compact)${RESET}"
@@ -267,17 +268,47 @@ echo ""
 CODE=$(json_escape token.compact)
 CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"fast\"}'"
 
-show_request "POST /analyze  (token.compact, fast mode)"
+show_request "POST /analyze  (token.compact, fast mode — full canonical response)"
 pause
 send_request "$CMD"
 pause
 
-# ─── 11. Analyze — Deep Mode with Detect ─────────────────────────────────────
+# ─── 11. Analyze — Filtered Sections ─────────────────────────────────────────
 
-banner "11. Analyze — Deep Mode (Detect Version)"
+banner "11. Analyze — Filtered Sections"
 
-describe "Deep mode compiles the code first, then returns both structural analysis
-and compilation results. Using \"detect\" picks the right compiler from the pragma."
+describe "Use the 'include' parameter to request only specific sections. Summary and
+structure are always returned. Available sections: diagnostics, facts, findings,
+recommendations, circuits, compilation."
+
+CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"fast\", \"include\": [\"findings\", \"recommendations\"]}'"
+
+show_request "POST /analyze  (token.compact, fast mode, include: findings + recommendations only)"
+pause
+send_request "$CMD"
+pause
+
+# ─── 12. Analyze — Single Circuit ────────────────────────────────────────────
+
+banner "12. Analyze — Single Circuit"
+
+describe "Use the 'circuit' parameter to focus the analysis on a specific circuit.
+Returns explanation, facts, and findings for just that circuit."
+
+CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"fast\", \"circuit\": \"transfer\"}'"
+
+show_request "POST /analyze  (token.compact, fast mode, circuit: transfer)"
+pause
+send_request "$CMD"
+pause
+
+# ─── 13. Analyze — Deep Mode with Detect ─────────────────────────────────────
+
+banner "13. Analyze — Deep Mode (Detect Version)"
+
+describe "Deep mode adds compilation to the analysis pipeline. The compiler validates
+your code and returns diagnostics. Using \"detect\" picks the right compiler from
+the pragma. The response includes both analysis results and compilation results."
 
 CODE=$(json_escape counter.compact)
 CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"deep\", \"versions\": [\"detect\"]}'"
@@ -287,12 +318,12 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 12. Analyze — Deep Mode, Multiple Versions ──────────────────────────────
+# ─── 14. Analyze — Deep Mode, Multiple Versions ──────────────────────────────
 
-banner "12. Analyze — Deep Mode (Multiple Versions)"
+banner "14. Analyze — Deep Mode (Multiple Versions)"
 
 describe "Deep analysis across multiple compiler versions shows which versions
-successfully compile the code."
+successfully compile the code. Each version gets its own compilation result."
 
 CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"deep\", \"versions\": [\"0.29.0\", \"0.26.0\", \"0.24.0\"]}'"
 
@@ -301,9 +332,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 13. Diff ─────────────────────────────────────────────────────────────────
+# ─── 15. Diff ─────────────────────────────────────────────────────────────────
 
-banner "13. Semantic Contract Diff"
+banner "15. Semantic Contract Diff"
 
 describe "POST /diff compares two contract versions and reports structural changes:
 added/removed/modified circuits, ledger fields, imports, and pragma."
@@ -325,9 +356,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 14. Root ─────────────────────────────────────────────────────────────────
+# ─── 16. Root ─────────────────────────────────────────────────────────────────
 
-banner "14. API Index"
+banner "16. API Index"
 
 describe "The root endpoint lists all available endpoints."
 
@@ -345,9 +376,15 @@ echo "  GET  /health    - Service health check"
 echo "  GET  /versions  - Installed compiler versions with language version mapping"
 echo "  POST /compile   - Compile Compact code (detect / latest / specific / multi-version)"
 echo "  POST /format    - Format Compact code (detect / latest / specific / multi-version)"
-echo "  POST /analyze   - Analyze contract structure (fast / deep, multi-version)"
+echo "  POST /analyze   - 5-stage analysis pipeline (fast / deep, multi-version)"
 echo "  POST /diff      - Semantic contract diff"
 echo "  GET  /          - API index"
+echo ""
+echo "Analyze features:"
+echo "  mode: fast      - Source-level analysis (no compilation)"
+echo "  mode: deep      - Analysis + compilation diagnostics"
+echo "  include: [...]  - Filter response sections (findings, recommendations, etc.)"
+echo "  circuit: name   - Focus analysis on a single circuit"
 echo ""
 echo "Special version values:"
 echo "  \"detect\" - Auto-select compiler based on pragma in source code"
