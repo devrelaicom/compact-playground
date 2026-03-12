@@ -9,6 +9,11 @@ primary_region = 'ams'
 [build]
   dockerfile = 'Dockerfile'
 
+[mounts]
+  source = "cache_data"
+  destination = "/data/cache"
+  initial_size = "1gb"
+
 [http_service]
   internal_port = 8080
   force_https = true
@@ -30,6 +35,5 @@ primary_region = 'ams'
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '1gb'
+  memory = '1024mb'
   cpus = 1
-  memory_mb = 1024

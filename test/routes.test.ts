@@ -29,8 +29,15 @@ vi.mock("../backend/src/utils.js", () => ({
 vi.mock("../backend/src/config.js", () => ({
   getConfig: vi.fn(() => ({
     defaultCompilerVersion: "latest",
+    cacheEnabled: false,
   })),
   resetConfig: vi.fn(),
+}));
+
+vi.mock("../backend/src/cache.js", () => ({
+  getFileCache: vi.fn(() => null),
+  generateCacheKey: vi.fn(() => "mock-key"),
+  resetFileCache: vi.fn(),
 }));
 
 vi.mock("../backend/src/version-manager.js", () => ({
@@ -397,7 +404,7 @@ describe("POST /diff", () => {
 
   it("valid before+after → 200", async () => {
     const diffResult = { changes: [], linesAdded: 0, linesRemoved: 0 };
-    mockDiffContracts.mockReturnValue(diffResult);
+    mockDiffContracts.mockResolvedValue(diffResult);
 
     const res = await app.request("/diff", {
       method: "POST",

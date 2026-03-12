@@ -6,6 +6,7 @@ import { buildRecommendations } from "./recommendations.js";
 import { buildExplanations } from "./explanations.js";
 import { compile } from "../compiler.js";
 import { runMultiVersion } from "../middleware.js";
+import { getFileCache, generateCacheKey } from "../cache.js";
 import type {
   AnalysisResponse,
   AnalysisSummary,
@@ -135,6 +136,18 @@ export async function analyzeContract(
   code: string,
   options: AnalyzeOptions,
 ): Promise<AnalysisResponse> {
+  // Only cache fast-mode analysis (deep mode depends on compile results and versions)
+  const cache = options.mode === "fast" ? getFileCache() : null;
+  const cacheKey = cache ? generateCacheKey(code, "none", { mode: options.mode }) : null;
+
+  if (cache && cacheKey) {
+    const cached = await cache.get<AnalysisResponse>("analyze", cacheKey);
+    if (cached) {
+      // Apply post-processing filters on cached result
+      return applyFilters(cached, options);
+    }
+  }
+
   // Stage 1: Parse
   const parsed = parseSource(code);
 
@@ -147,8 +160,8 @@ export async function analyzeContract(
   // Stage 4: Build recommendations
   const recommendations = buildRecommendations(findings);
 
-  // Stage 5: Build circuit analyses (with explanations)
-  const circuitAnalyses = buildCircuitAnalyses(model, findings, options.circuit);
+  // Stage 5: Build circuit analyses (with explanations) — no filter here, applied post-cache
+  const circuitAnalyses = buildCircuitAnalyses(model, findings);
 
   // Build response
   const response: AnalysisResponse = {
@@ -214,13 +227,32 @@ export async function analyzeContract(
     }
   }
 
+  // Cache the full unfiltered result for fast mode
+  if (cache && cacheKey) {
+    await cache.set("analyze", cacheKey, response);
+  }
+
+  // Apply post-processing filters
+  return applyFilters(response, options);
+}
+
+function applyFilters(response: AnalysisResponse, options: AnalyzeOptions): AnalysisResponse {
+  // Apply circuit filter
+  if (options.circuit) {
+    response = {
+      ...response,
+      circuits: response.circuits.filter((c) => c.name === options.circuit),
+    };
+  }
+
   // Apply include[] filtering (omit sections not requested)
   // summary and structure are always returned
   if (options.include && options.include.length > 0) {
+    response = { ...response };
     const include = new Set(options.include);
     if (!include.has("diagnostics")) response.diagnostics = [];
     if (!include.has("facts")) {
-      response.facts = { hasStdLibImport: model.hasStdLibImport, unusedWitnesses: [] };
+      response.facts = { hasStdLibImport: response.facts.hasStdLibImport, unusedWitnesses: [] };
     }
     if (!include.has("findings")) response.findings = [];
     if (!include.has("recommendations")) response.recommendations = [];

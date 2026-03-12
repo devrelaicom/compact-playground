@@ -1,9 +1,29 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { compile, resetCompileCache } from "../backend/src/compiler.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { compile } from "../backend/src/compiler.js";
+import { resetFileCache, getFileCache } from "../backend/src/cache.js";
+import { resetConfig } from "../backend/src/config.js";
+import { mkdtemp, rm } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
+
+let tempCacheDir: string;
 
 describe("compile", () => {
-  beforeEach(() => {
-    resetCompileCache();
+  beforeEach(async () => {
+    resetFileCache();
+    resetConfig();
+    tempCacheDir = await mkdtemp(join(tmpdir(), "compile-cache-test-"));
+    process.env.CACHE_DIR = tempCacheDir;
+    // Initialize the file cache for this test
+    const cache = getFileCache();
+    if (cache) await cache.init();
+  });
+
+  afterEach(async () => {
+    resetFileCache();
+    resetConfig();
+    delete process.env.CACHE_DIR;
+    await rm(tempCacheDir, { recursive: true, force: true });
   });
 
   it("compiles valid Compact code successfully", async () => {
@@ -65,18 +85,26 @@ export circuit increment(): [] {
     expect(result2.compiledAt).toBe(result1.compiledAt);
   }, 60000);
 
-  it("does not return cached result after resetCompileCache", async () => {
+  it("does not return cached result after resetFileCache with new dir", async () => {
     const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;
 }`;
     const result1 = await compile(code);
     expect(result1.success).toBe(true);
 
-    resetCompileCache();
+    // Reset cache and point to a fresh empty directory
+    resetFileCache();
+    resetConfig();
+    const freshDir = await mkdtemp(join(tmpdir(), "compile-cache-fresh-"));
+    process.env.CACHE_DIR = freshDir;
+    const cache = getFileCache();
+    if (cache) await cache.init();
 
     const result2 = await compile(code);
     expect(result2.success).toBe(true);
-    // After cache reset, compiledAt should differ (fresh compilation)
+    // After cache reset with new dir, compiledAt should differ (fresh compilation)
     expect(result2.compiledAt).not.toBe(result1.compiledAt);
+
+    await rm(freshDir, { recursive: true, force: true });
   }, 60000);
 });

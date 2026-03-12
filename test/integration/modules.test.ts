@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseSource } from "../../backend/src/analysis/parser.js";
 import { diffContracts } from "../../backend/src/differ.js";
-import { CompileCache, generateCacheKey } from "../../backend/src/cache.js";
+import { generateCacheKey } from "../../backend/src/cache.js";
 import {
   resolveVersion,
   compareVersions,
@@ -10,7 +10,7 @@ import {
 import { formatCode } from "../../backend/src/formatter.js";
 
 describe("Integration: Analyze → Diff pipeline", () => {
-  it("analyzes two contracts and diffs them end-to-end", () => {
+  it("analyzes two contracts and diffs them end-to-end", async () => {
     const v1 = `pragma language_version >= 0.21;
 
 import CompactStandardLibrary;
@@ -46,7 +46,7 @@ export circuit getBalance(): Uint<64> {
     expect(analysis2.ledger).toHaveLength(2);
 
     // Diff them
-    const diff = diffContracts(v1, v2);
+    const diff = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.added).toHaveLength(1);
@@ -57,7 +57,7 @@ export circuit getBalance(): Uint<64> {
     expect(diff.circuits.modified).toHaveLength(0);
   });
 
-  it("detects pragma changes between versions", () => {
+  it("detects pragma changes between versions", async () => {
     const v1 = `pragma language_version >= 0.21;
 
 export circuit hello(): [] {}`;
@@ -66,7 +66,7 @@ export circuit hello(): [] {}`;
 
 export circuit hello(): [] {}`;
 
-    const diff = diffContracts(v1, v2);
+    const diff = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.pragma.changed).toBe(true);
@@ -76,7 +76,7 @@ export circuit hello(): [] {}`;
     expect(diff.circuits.removed).toHaveLength(0);
   });
 
-  it("detects modified circuit signatures", () => {
+  it("detects modified circuit signatures", async () => {
     const v1 = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;
 }`;
@@ -85,7 +85,7 @@ export circuit hello(): [] {}`;
   return (a + b + c) as Uint<64>;
 }`;
 
-    const diff = diffContracts(v1, v2);
+    const diff = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.modified).toHaveLength(1);
@@ -93,7 +93,7 @@ export circuit hello(): [] {}`;
     expect(diff.circuits.modified[0].changes).toContain("params");
   });
 
-  it("reports no changes for identical contracts", () => {
+  it("reports no changes for identical contracts", async () => {
     const code = `pragma language_version >= 0.21;
 
 import CompactStandardLibrary;
@@ -104,7 +104,7 @@ export circuit increment(): [] {
   counter.increment(1n);
 }`;
 
-    const diff = diffContracts(code, code);
+    const diff = await diffContracts(code, code);
 
     expect(diff.hasChanges).toBe(false);
     expect(diff.circuits.added).toHaveLength(0);
@@ -116,8 +116,7 @@ export circuit increment(): [] {
 });
 
 describe("Integration: Cache with real compile keys", () => {
-  it("caches and retrieves compilation results with proper key generation", () => {
-    const cache = new CompileCache({ maxSize: 100, ttl: 60000 });
+  it("generates proper SHA-256 cache keys", () => {
     const code = "export circuit test(): [] {}";
     const version = "0.26.0";
     const options = { skipZk: true, wrapWithDefaults: true };
@@ -126,24 +125,9 @@ describe("Integration: Cache with real compile keys", () => {
     expect(typeof key).toBe("string");
     expect(key.length).toBe(64); // SHA-256 hex
 
-    // Cache miss
-    expect(cache.get(key)).toBeUndefined();
-
-    // Store result
-    const result = {
-      success: true,
-      output: "Compilation successful",
-      compiledAt: new Date().toISOString(),
-    };
-    cache.set(key, result);
-
-    // Cache hit
-    expect(cache.get(key)).toEqual(result);
-
     // Same code with different version = different key
     const key2 = generateCacheKey(code, "0.25.0", options);
     expect(key2).not.toBe(key);
-    expect(cache.get(key2)).toBeUndefined();
   });
 
   it("normalizes whitespace differences before keying", () => {
@@ -156,34 +140,6 @@ describe("Integration: Cache with real compile keys", () => {
     const key3 = generateCacheKey("a\r\nb", "0.26.0", {});
     const key4 = generateCacheKey("a\nb", "0.26.0", {});
     expect(key3).toBe(key4);
-  });
-
-  it("evicts oldest entry when cache is full", () => {
-    const cache = new CompileCache({ maxSize: 2, ttl: 60000 });
-
-    cache.set("key1", { success: true });
-    cache.set("key2", { success: true });
-    cache.set("key3", { success: true }); // Should evict key1
-
-    expect(cache.get("key1")).toBeUndefined();
-    expect(cache.get("key2")).toBeDefined();
-    expect(cache.get("key3")).toBeDefined();
-  });
-
-  it("tracks hit/miss statistics across operations", () => {
-    const cache = new CompileCache({ maxSize: 10, ttl: 60000 });
-    const key = generateCacheKey("test", "0.26.0", {});
-
-    cache.get(key); // miss
-    cache.set(key, { success: true });
-    cache.get(key); // hit
-    cache.get(key); // hit
-
-    const stats = cache.stats();
-    expect(stats.hits).toBe(2);
-    expect(stats.misses).toBe(1);
-    expect(stats.hitRate).toBeCloseTo(2 / 3);
-    expect(stats.size).toBe(1);
   });
 });
 

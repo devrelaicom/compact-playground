@@ -7,6 +7,7 @@ import {
   resolveVersion,
 } from "../version-manager.js";
 import { getConfig } from "../config.js";
+import { getFileCache } from "../cache.js";
 
 const healthRoutes = new Hono();
 
@@ -53,6 +54,9 @@ healthRoutes.get("/health", async (c) => {
   const defaultVersionValid =
     configuredDefault === "latest" ? installed.length > 0 : installed.includes(configuredDefault);
 
+  const fileCache = getFileCache();
+  const cacheStats = fileCache ? fileCache.stats() : null;
+
   return c.json({
     status: cliInstalled && defaultVersionValid ? "healthy" : "degraded",
     compactCli: {
@@ -64,6 +68,7 @@ healthRoutes.get("/health", async (c) => {
       resolved: defaultVersion,
       valid: defaultVersionValid,
     },
+    cache: cacheStats,
     timestamp: new Date().toISOString(),
   });
 });

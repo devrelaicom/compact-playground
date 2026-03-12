@@ -4,6 +4,7 @@ import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "./config.js";
 import { getDefaultVersion, prepareVersionDir } from "./version-manager.js";
+import { getFileCache, generateCacheKey } from "./cache.js";
 
 export interface FormatOptions {
   timeout?: number;
@@ -23,6 +24,18 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
     return { success: false, error: "No code to format" };
   }
 
+  // Check file cache
+  const cache = getFileCache();
+  const version = options.version || (await getDefaultVersion());
+  const cacheKey = cache ? generateCacheKey(code, version || "default", {}) : null;
+
+  if (cache && cacheKey) {
+    const cached = await cache.get<FormatResult>("format", cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   const config = getConfig();
   const sessionId = uuidv4();
   const sessionDir = join(config.tempDir, `fmt-${sessionId}`);
@@ -35,9 +48,6 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
 
     // Use `compact format <file>`
     const compactCli = config.compactCliPath;
-
-    // Resolve the version to use (explicit or default)
-    const version = options.version || (await getDefaultVersion());
 
     // Set up an isolated --directory for this version. compact update is used
     // to select the version within the directory; it does not download if the
@@ -80,6 +90,10 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
 
     if (changed) {
       formatResult.diff = generateSimpleDiff(code, formatted);
+    }
+
+    if (cache && cacheKey) {
+      await cache.set("format", cacheKey, formatResult);
     }
 
     return formatResult;
