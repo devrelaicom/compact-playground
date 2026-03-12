@@ -7,8 +7,39 @@ import {
   resolveVersion,
 } from "../version-manager.js";
 import { getConfig } from "../config.js";
+import { getFileCache } from "../cache.js";
 
 const healthRoutes = new Hono();
+
+// Pre-computed versions response, populated at startup via warmVersionsCache()
+let cachedVersionsResponse: {
+  default: string | null;
+  installed: { version: string; languageVersion: string }[];
+} | null = null;
+
+/**
+ * Builds the versions response once at startup so /versions can serve it
+ * without spawning any subprocesses.
+ */
+export async function warmVersionsCache(): Promise<void> {
+  const installed = await listInstalledVersions();
+  const defaultVersion = resolveVersion("latest", installed);
+
+  let langMap: Map<string, string>;
+  try {
+    langMap = await buildLanguageVersionMap();
+  } catch {
+    langMap = new Map();
+  }
+
+  cachedVersionsResponse = {
+    default: defaultVersion,
+    installed: installed.map((version) => ({
+      version,
+      languageVersion: langMap.get(version) || "unknown",
+    })),
+  };
+}
 
 healthRoutes.get("/health", async (c) => {
   const cliVersion = await getCompilerVersion();
@@ -23,6 +54,9 @@ healthRoutes.get("/health", async (c) => {
   const defaultVersionValid =
     configuredDefault === "latest" ? installed.length > 0 : installed.includes(configuredDefault);
 
+  const fileCache = getFileCache();
+  const cacheStats = fileCache ? fileCache.stats() : null;
+
   return c.json({
     status: cliInstalled && defaultVersionValid ? "healthy" : "degraded",
     compactCli: {
@@ -34,30 +68,16 @@ healthRoutes.get("/health", async (c) => {
       resolved: defaultVersion,
       valid: defaultVersionValid,
     },
+    cache: cacheStats,
     timestamp: new Date().toISOString(),
   });
 });
 
-healthRoutes.get("/versions", async (c) => {
-  const installed = await listInstalledVersions();
-  const defaultVersion = resolveVersion("latest", installed);
-
-  let langMap: Map<string, string>;
-  try {
-    langMap = await buildLanguageVersionMap();
-  } catch {
-    langMap = new Map();
+healthRoutes.get("/versions", (c) => {
+  if (!cachedVersionsResponse) {
+    return c.json({ error: "Version information not yet available" }, 503);
   }
-
-  const installedWithLang = installed.map((version) => ({
-    version,
-    languageVersion: langMap.get(version) || "unknown",
-  }));
-
-  return c.json({
-    default: defaultVersion,
-    installed: installedWithLang,
-  });
+  return c.json(cachedVersionsResponse);
 });
 
 export { healthRoutes };

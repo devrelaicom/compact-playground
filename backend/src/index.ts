@@ -9,7 +9,8 @@ import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
 import { validateRequestBody } from "./middleware.js";
 
-import { healthRoutes } from "./routes/health.js";
+import { healthRoutes, warmVersionsCache } from "./routes/health.js";
+import { getFileCache } from "./cache.js";
 
 const app = new Hono();
 
@@ -61,6 +62,27 @@ console.log(`
 ║           Starting on port ${String(port)}                    ║
 ╚═══════════════════════════════════════════════════╝
 `);
+
+// Initialize file cache and warm versions cache at startup
+const fileCache = getFileCache();
+if (fileCache) {
+  fileCache
+    .init()
+    .then(() => {
+      console.log("File cache initialized");
+    })
+    .catch((err: unknown) => {
+      console.warn("Failed to initialize file cache:", err);
+    });
+}
+
+warmVersionsCache()
+  .then(() => {
+    console.log("Versions cache warmed");
+  })
+  .catch((err: unknown) => {
+    console.warn("Failed to warm versions cache:", err);
+  });
 
 serve({
   fetch: app.fetch,

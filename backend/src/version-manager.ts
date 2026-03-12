@@ -178,16 +178,15 @@ export async function buildLanguageVersionMap(): Promise<Map<string, string>> {
   const installed = await listInstalledVersions();
   const map = new Map<string, string>();
 
-  await Promise.allSettled(
-    installed.map(async (version) => {
-      try {
-        const langVersion = await getCompilerLanguageVersion(version);
-        map.set(version, langVersion);
-      } catch {
-        // Skip versions that fail
-      }
-    }),
-  );
+  // Run sequentially to avoid OOM — each compiler process uses ~180MB
+  for (const version of installed) {
+    try {
+      const langVersion = await getCompilerLanguageVersion(version);
+      map.set(version, langVersion);
+    } catch {
+      // Skip versions that fail
+    }
+  }
 
   return map;
 }

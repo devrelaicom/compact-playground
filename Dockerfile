@@ -75,6 +75,9 @@ COPY package*.json ./
 # Create temp directory for compilation
 RUN mkdir -p /tmp/compact-playground
 
+# Create persistent cache directory
+RUN mkdir -p /data/cache
+
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
@@ -82,8 +85,10 @@ ENV TEMP_DIR=/tmp/compact-playground
 ENV COMPACT_CLI_PATH=compact
 ENV DEFAULT_COMPILER_VERSION=$DEFAULT_COMPILER
 ENV CACHE_ENABLED=true
-ENV CACHE_MAX_SIZE=1000
-ENV CACHE_TTL=3600000
+ENV CACHE_DIR=/data/cache
+ENV CACHE_MAX_DISK_MB=800
+ENV CACHE_MAX_ENTRIES=50000
+ENV CACHE_TTL=2592000000
 
 # Expose port
 EXPOSE 8080

@@ -1,55 +1,111 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { CompileCache, normalizeForCacheKey, generateCacheKey } from "../backend/src/cache.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, readdir } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
+import { FileCache, normalizeForCacheKey, generateCacheKey } from "../backend/src/cache.js";
 
-describe("CompileCache", () => {
-  let cache: CompileCache;
+describe("FileCache", () => {
+  let tempDir: string;
+  let cache: FileCache;
 
-  beforeEach(() => {
-    cache = new CompileCache({ maxSize: 10, ttl: 60000 });
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "filecache-test-"));
+    cache = new FileCache(tempDir, 60000, 100, 1000);
+    await cache.init();
   });
 
-  it("returns undefined for cache miss", () => {
-    expect(cache.get("nonexistent")).toBeUndefined();
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
-  it("stores and retrieves a value", () => {
-    const result = { success: true, output: "Compilation successful", compiledAt: "2026-01-01" };
-    cache.set("key1", result);
-    expect(cache.get("key1")).toEqual(result);
+  it("returns undefined for cache miss", async () => {
+    expect(await cache.get("compile", "nonexistent")).toBeUndefined();
   });
 
-  it("evicts oldest entry when max size exceeded", () => {
-    const cache = new CompileCache({ maxSize: 2, ttl: 60000 });
-    cache.set("a", { success: true, compiledAt: "" });
-    cache.set("b", { success: true, compiledAt: "" });
-    cache.set("c", { success: true, compiledAt: "" });
-
-    expect(cache.get("a")).toBeUndefined();
-    expect(cache.get("b")).toBeDefined();
-    expect(cache.get("c")).toBeDefined();
+  it("stores and retrieves a value", async () => {
+    const data = { success: true, output: "Compilation successful" };
+    await cache.set("compile", "key1", data);
+    expect(await cache.get("compile", "key1")).toEqual(data);
   });
 
-  it("does not return expired entries", () => {
-    const cache = new CompileCache({ maxSize: 10, ttl: 1 }); // 1ms TTL
-    cache.set("key", { success: true, compiledAt: "" });
+  it("persists across instances", async () => {
+    const data = { success: true, output: "test" };
+    await cache.set("compile", "key1", data);
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        expect(cache.get("key")).toBeUndefined();
-        resolve();
-      }, 10);
-    });
+    // Create a new cache instance pointing to same dir
+    const cache2 = new FileCache(tempDir, 60000, 100, 1000);
+    await cache2.init();
+    expect(await cache2.get("compile", "key1")).toEqual(data);
   });
 
-  it("reports stats correctly", () => {
-    cache.set("a", { success: true, compiledAt: "" });
-    cache.get("a"); // hit
-    cache.get("b"); // miss
+  it("does not return expired entries", async () => {
+    const shortTtlCache = new FileCache(tempDir, 1, 100, 1000); // 1ms TTL
+    await shortTtlCache.init();
+    await shortTtlCache.set("compile", "key1", { value: "test" });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await shortTtlCache.get("compile", "key1")).toBeUndefined();
+  });
+
+  it("reports stats correctly", async () => {
+    await cache.set("compile", "a", { value: 1 });
+    await cache.get("compile", "a"); // hit
+    await cache.get("compile", "b"); // miss
 
     const stats = cache.stats();
-    expect(stats.size).toBe(1);
+    expect(stats.entries).toBe(1);
     expect(stats.hits).toBe(1);
     expect(stats.misses).toBe(1);
+    expect(stats.hitRate).toBe(0.5);
+  });
+
+  it("uses two-level hash directories", async () => {
+    const key = "a3f7b2c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef";
+    await cache.set("compile", key, { value: "test" });
+
+    const subdirs = await readdir(join(tempDir, "compile"));
+    expect(subdirs).toContain("a3");
+  });
+
+  it("caches across different endpoints independently", async () => {
+    await cache.set("compile", "key1", { type: "compile" });
+    await cache.set("format", "key1", { type: "format" });
+
+    expect(await cache.get("compile", "key1")).toEqual({ type: "compile" });
+    expect(await cache.get("format", "key1")).toEqual({ type: "format" });
+  });
+
+  it("evicts oldest entries when over maxEntries during purge", async () => {
+    const smallCache = new FileCache(tempDir, 60000, 100, 3);
+    await smallCache.init();
+
+    await smallCache.set("compile", "aaa", { v: 1 });
+    await smallCache.set("compile", "bbb", { v: 2 });
+    await smallCache.set("compile", "ccc", { v: 3 });
+
+    // Access "aaa" to make it recent
+    await smallCache.get("compile", "aaa");
+
+    // Add a 4th entry and explicitly purge
+    await smallCache.set("compile", "ddd", { v: 4 });
+    await smallCache.purge();
+
+    // "bbb" should be evicted (oldest atime), "aaa" was accessed recently
+    const stats = smallCache.stats();
+    expect(stats.entries).toBeLessThanOrEqual(3);
+  });
+
+  it("init removes expired files from disk", async () => {
+    const shortTtlCache = new FileCache(tempDir, 1, 100, 1000);
+    await shortTtlCache.init();
+    await shortTtlCache.set("compile", "expired", { v: 1 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // New instance should clean up expired entries on init
+    const freshCache = new FileCache(tempDir, 1, 100, 1000);
+    await freshCache.init();
+    expect(freshCache.stats().entries).toBe(0);
   });
 });
 

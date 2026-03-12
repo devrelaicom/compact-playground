@@ -1,4 +1,5 @@
 import { parseSource } from "./analysis/parser.js";
+import { getFileCache, generateCacheKey } from "./cache.js";
 import type { ParsedCircuit, ParsedLedgerField } from "./analysis/types.js";
 
 export interface CircuitDiff {
@@ -37,7 +38,18 @@ export interface DiffResult {
   };
 }
 
-export function diffContracts(before: string, after: string): DiffResult {
+export async function diffContracts(before: string, after: string): Promise<DiffResult> {
+  // Check cache
+  const cache = getFileCache();
+  const cacheKey = cache ? generateCacheKey(before + "\x00" + after, "none", {}) : null;
+
+  if (cache && cacheKey) {
+    const cached = await cache.get<DiffResult>("diff", cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   const beforeAnalysis = parseSource(before);
   const afterAnalysis = parseSource(after);
 
@@ -109,11 +121,17 @@ export function diffContracts(before: string, after: string): DiffResult {
     removedImports.length > 0 ||
     pragmaChanged;
 
-  return {
+  const result: DiffResult = {
     hasChanges,
     circuits: { added: addedCircuits, removed: removedCircuits, modified: modifiedCircuits },
     ledger: { added: addedLedger, removed: removedLedger, modified: modifiedLedger },
     pragma: { before: beforeAnalysis.pragma, after: afterAnalysis.pragma, changed: pragmaChanged },
     imports: { added: addedImports, removed: removedImports },
   };
+
+  if (cache && cacheKey) {
+    await cache.set("diff", cacheKey, result);
+  }
+
+  return result;
 }

@@ -21,7 +21,7 @@ diffRoutes.post("/diff", async (c) => {
   const { before, after } = parsed.data;
 
   try {
-    const result = diffContracts(before, after);
+    const result = await diffContracts(before, after);
     return c.json({ success: true, ...result });
   } catch (error) {
     console.error("Diff error:", error);

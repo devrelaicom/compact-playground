@@ -6,26 +6,7 @@ import { wrapWithDefaults, hasPragma, getWrapperLineOffset } from "./wrapper.js"
 import { parseCompilerErrors, CompilerError } from "./parser.js";
 import { getConfig } from "./config.js";
 import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
-import { CompileCache, generateCacheKey } from "./cache.js";
-
-let compileCache: CompileCache | null = null;
-
-function getCache(): CompileCache | null {
-  const config = getConfig();
-  if (!config.cacheEnabled) return null;
-  if (!compileCache) {
-    compileCache = new CompileCache({
-      maxSize: config.cacheMaxSize,
-      ttl: config.cacheTtl,
-    });
-  }
-  return compileCache;
-}
-
-/** Reset compile cache (for testing) */
-export function resetCompileCache(): void {
-  compileCache = null;
-}
+import { getFileCache, generateCacheKey } from "./cache.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -63,7 +44,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
     const compilerVersion = options.version || (await getDefaultVersion());
 
     // Check cache before doing any work
-    const cache = getCache();
+    const cache = getFileCache();
     const cacheKey = cache
       ? generateCacheKey(code, compilerVersion || "default", {
           wrapWithDefaults: options.wrapWithDefaults,
@@ -72,10 +53,9 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       : null;
 
     if (cache && cacheKey) {
-      const cached = cache.get(cacheKey);
+      const cached = await cache.get<CompileResult>("compile", cacheKey);
       if (cached) {
-        // Cache stores full CompileResult objects from successful compilations
-        return cached as CompileResult;
+        return cached;
       }
     }
 
@@ -135,7 +115,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       };
 
       if (cache && cacheKey) {
-        cache.set(cacheKey, compileResult);
+        await cache.set("compile", cacheKey, compileResult);
       }
 
       return compileResult;

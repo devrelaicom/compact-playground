@@ -29,8 +29,15 @@ vi.mock("../backend/src/utils.js", () => ({
 vi.mock("../backend/src/config.js", () => ({
   getConfig: vi.fn(() => ({
     defaultCompilerVersion: "latest",
+    cacheEnabled: false,
   })),
   resetConfig: vi.fn(),
+}));
+
+vi.mock("../backend/src/cache.js", () => ({
+  getFileCache: vi.fn(() => null),
+  generateCacheKey: vi.fn(() => "mock-key"),
+  resetFileCache: vi.fn(),
 }));
 
 vi.mock("../backend/src/version-manager.js", () => ({
@@ -65,7 +72,7 @@ import { compileRoutes } from "../backend/src/routes/compile.js";
 import { formatRoutes } from "../backend/src/routes/format.js";
 import { analyzeRoutes } from "../backend/src/routes/analyze.js";
 import { diffRoutes } from "../backend/src/routes/diff.js";
-import { healthRoutes } from "../backend/src/routes/health.js";
+import { healthRoutes, warmVersionsCache } from "../backend/src/routes/health.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
@@ -397,7 +404,7 @@ describe("POST /diff", () => {
 
   it("valid before+after → 200", async () => {
     const diffResult = { changes: [], linesAdded: 0, linesRemoved: 0 };
-    mockDiffContracts.mockReturnValue(diffResult);
+    mockDiffContracts.mockResolvedValue(diffResult);
 
     const res = await app.request("/diff", {
       method: "POST",
@@ -497,6 +504,9 @@ describe("GET /versions", () => {
         ["0.28.0", "0.9"],
       ]),
     );
+
+    // Warm the cache before requesting (simulates startup)
+    await warmVersionsCache();
 
     const res = await app.request("/versions", { method: "GET" });
 

@@ -1,13 +1,18 @@
-# fly.toml app configuration file generated for compact-playground on 2026-03-10T09:11:57Z
+# fly.toml app configuration file generated for compact-playground on 2026-03-12T00:58:19Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'compact-playground'
-primary_region = 'iad'
+primary_region = 'ams'
 
 [build]
   dockerfile = 'Dockerfile'
+
+[mounts]
+  source = "cache_data"
+  destination = "/data/cache"
+  initial_size = "1gb"
 
 [http_service]
   internal_port = 8080
@@ -25,6 +30,10 @@ primary_region = 'iad'
     grace_period = '30s'
     path = '/health'
 
+[[restart]]
+  policy = 'on-failure'
+
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '512mb'
+  memory = '1024mb'
+  cpus = 1
