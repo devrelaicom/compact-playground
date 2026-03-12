@@ -161,7 +161,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
   }
 }
 
-interface CompilerOutput {
+export interface CompilerOutput {
   exitCode: number;
   stdout: string;
   stderr: string;
@@ -170,7 +170,7 @@ interface CompilerOutput {
 /**
  * Runs the compact compiler with the given arguments
  */
-async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
+export async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
   return new Promise((resolve, reject) => {
     const compactCli = getConfig().compactCliPath;
 

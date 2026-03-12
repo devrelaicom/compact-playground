@@ -243,18 +243,66 @@ pause
 send_request "$CMD"
 pause
 
+# ─── 8. Compile Archive — Multi-File Contract ───────────────────────────────
+
+banner "8. Compile Archive — Multi-File Contract"
+
+describe "POST /compile/archive accepts a .tar.gz archive containing multiple .compact files.
+The compiler resolves imports relative to the entry point's directory.
+
+This demo uses two contracts:
+  - Vault.compact (entry point) — imports MathLib for arithmetic
+  - MathLib.compact (library)   — provides add() and subtract() circuits"
+
+echo -e "${DIM}Contract: archive/Vault.compact (entry point)${RESET}"
+echo -e "${CYAN}$(read_contract archive/Vault.compact)${RESET}"
+echo ""
+echo -e "${DIM}Contract: archive/MathLib.compact (imported library)${RESET}"
+echo -e "${CYAN}$(read_contract archive/MathLib.compact)${RESET}"
+echo ""
+
+# Create the .tar.gz archive from the demo contracts
+ARCHIVE_TMP=$(mktemp /tmp/demo-archive-XXXXXX.tar.gz)
+tar -czf "$ARCHIVE_TMP" -C "$SCRIPT_DIR/contracts/archive" Vault.compact MathLib.compact
+
+CMD="curl -s $API/compile/archive -F archive=@$ARCHIVE_TMP -F entryPoint=Vault.compact"
+
+show_request "POST /compile/archive  (Vault.compact + MathLib.compact archive)"
+pause
+send_request "$CMD"
+rm -f "$ARCHIVE_TMP"
+pause
+
+# ─── 9. Compile Archive — With Options ──────────────────────────────────────
+
+banner "9. Compile Archive — With Options"
+
+describe "The archive endpoint accepts an optional JSON 'options' field.
+Setting skipZk to false requests full ZK compilation (slower but complete)."
+
+ARCHIVE_TMP=$(mktemp /tmp/demo-archive-XXXXXX.tar.gz)
+tar -czf "$ARCHIVE_TMP" -C "$SCRIPT_DIR/contracts/archive" Vault.compact MathLib.compact
+
+CMD="curl -s $API/compile/archive -F archive=@$ARCHIVE_TMP -F entryPoint=Vault.compact -F 'options={\"skipZk\": true}'"
+
+show_request "POST /compile/archive  (with options: {\"skipZk\": true})"
+pause
+send_request "$CMD"
+rm -f "$ARCHIVE_TMP"
+pause
+
 # ─── Contract: unformatted.compact ───────────────────────────────────────────
 
-section "Contract: unformatted.compact (used in demos 8–9)"
+section "Contract: unformatted.compact (used in demos 10–11)"
 
 echo -e "${CYAN}$(read_contract unformatted.compact)${RESET}"
 echo ""
 CODE=$(json_escape unformatted.compact)
 pause
 
-# ─── 8. Format — Default Version ─────────────────────────────────────────────
+# ─── 10. Format — Default Version ────────────────────────────────────────────
 
-banner "8. Format — Default Version"
+banner "10. Format — Default Version"
 
 describe "POST /format runs the Compact formatter on your code. It returns the
 formatted output, whether anything changed, and a diff (always included when changed)."
@@ -266,9 +314,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 9. Format — Multiple Versions ───────────────────────────────────────────
+# ─── 11. Format — Multiple Versions ──────────────────────────────────────────
 
-banner "9. Format — Multiple Versions"
+banner "11. Format — Multiple Versions"
 
 describe "Format with multiple compiler versions to compare formatting differences.
 Using the same unformatted.compact code from above."
@@ -280,9 +328,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 10. Analyze — Fast Mode ─────────────────────────────────────────────────
+# ─── 12. Analyze — Fast Mode ─────────────────────────────────────────────────
 
-banner "10. Analyze — Fast Mode"
+banner "12. Analyze — Fast Mode"
 
 describe "POST /analyze runs a 5-stage analysis pipeline: parse → semantic model →
 rules → recommendations → circuit explanations. Fast mode is source-level only
@@ -301,9 +349,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 11. Analyze — Filtered Sections ─────────────────────────────────────────
+# ─── 13. Analyze — Filtered Sections ─────────────────────────────────────────
 
-banner "11. Analyze — Filtered Sections"
+banner "13. Analyze — Filtered Sections"
 
 describe "Use the 'include' parameter to request only specific sections. Summary and
 structure are always returned. Available sections: diagnostics, facts, findings,
@@ -316,9 +364,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 12. Analyze — Single Circuit ────────────────────────────────────────────
+# ─── 14. Analyze — Single Circuit ────────────────────────────────────────────
 
-banner "12. Analyze — Single Circuit"
+banner "14. Analyze — Single Circuit"
 
 describe "Use the 'circuit' parameter to focus the analysis on a specific circuit.
 Returns explanation, facts, and findings for just that circuit."
@@ -330,9 +378,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 13. Analyze — Deep Mode with Detect ─────────────────────────────────────
+# ─── 15. Analyze — Deep Mode with Detect ─────────────────────────────────────
 
-banner "13. Analyze — Deep Mode (Detect Version)"
+banner "15. Analyze — Deep Mode (Detect Version)"
 
 describe "Deep mode adds compilation to the analysis pipeline. The compiler validates
 your code and returns diagnostics. Using \"detect\" picks the right compiler from
@@ -346,9 +394,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 14. Analyze — Deep Mode, Multiple Versions ──────────────────────────────
+# ─── 16. Analyze — Deep Mode, Multiple Versions ──────────────────────────────
 
-banner "14. Analyze — Deep Mode (Multiple Versions)"
+banner "16. Analyze — Deep Mode (Multiple Versions)"
 
 describe "Deep analysis across multiple compiler versions shows which versions
 successfully compile the code. Each version gets its own compilation result."
@@ -360,9 +408,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 15. Diff ─────────────────────────────────────────────────────────────────
+# ─── 17. Diff ─────────────────────────────────────────────────────────────────
 
-banner "15. Semantic Contract Diff"
+banner "17. Semantic Contract Diff"
 
 describe "POST /diff compares two contract versions and reports structural changes:
 added/removed/modified circuits, ledger fields, imports, and pragma."
@@ -384,9 +432,9 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 16. Root ─────────────────────────────────────────────────────────────────
+# ─── 18. Root ─────────────────────────────────────────────────────────────────
 
-banner "16. API Index"
+banner "18. API Index"
 
 describe "The root endpoint lists all available endpoints."
 
@@ -400,13 +448,14 @@ pause
 banner "Demo Complete"
 
 echo "Endpoints demonstrated:"
-echo "  GET  /health    - Service health check"
-echo "  GET  /versions  - Installed compiler versions with language version mapping"
-echo "  POST /compile   - Compile Compact code (detect / latest / specific / multi-version)"
-echo "  POST /format    - Format Compact code (detect / latest / specific / multi-version)"
-echo "  POST /analyze   - 5-stage analysis pipeline (fast / deep, multi-version)"
-echo "  POST /diff      - Semantic contract diff"
-echo "  GET  /          - API index"
+echo "  GET  /health           - Service health check"
+echo "  GET  /versions         - Installed compiler versions with language version mapping"
+echo "  POST /compile          - Compile Compact code (detect / latest / specific / multi-version)"
+echo "  POST /compile/archive  - Compile multi-file .tar.gz archives with imports"
+echo "  POST /format           - Format Compact code (detect / latest / specific / multi-version)"
+echo "  POST /analyze          - 5-stage analysis pipeline (fast / deep, multi-version)"
+echo "  POST /diff             - Semantic contract diff"
+echo "  GET  /                 - API index"
 echo ""
 echo "Analyze features:"
 echo "  mode: fast      - Source-level analysis (no compilation)"
