@@ -65,7 +65,7 @@ import { compileRoutes } from "../backend/src/routes/compile.js";
 import { formatRoutes } from "../backend/src/routes/format.js";
 import { analyzeRoutes } from "../backend/src/routes/analyze.js";
 import { diffRoutes } from "../backend/src/routes/diff.js";
-import { healthRoutes } from "../backend/src/routes/health.js";
+import { healthRoutes, warmVersionsCache } from "../backend/src/routes/health.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
@@ -497,6 +497,9 @@ describe("GET /versions", () => {
         ["0.28.0", "0.9"],
       ]),
     );
+
+    // Warm the cache before requesting (simulates startup)
+    await warmVersionsCache();
 
     const res = await app.request("/versions", { method: "GET" });
 

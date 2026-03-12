@@ -9,7 +9,7 @@ import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
 import { validateRequestBody } from "./middleware.js";
 
-import { healthRoutes } from "./routes/health.js";
+import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 
 const app = new Hono();
 
@@ -61,6 +61,14 @@ console.log(`
 ║           Starting on port ${String(port)}                    ║
 ╚═══════════════════════════════════════════════════╝
 `);
+
+warmVersionsCache()
+  .then(() => {
+    console.log("Versions cache warmed");
+  })
+  .catch((err: unknown) => {
+    console.warn("Failed to warm versions cache:", err);
+  });
 
 serve({
   fetch: app.fetch,
