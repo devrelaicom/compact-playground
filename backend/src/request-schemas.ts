@@ -31,6 +31,12 @@ export const analyzeBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
   mode: z.enum(["fast", "deep"]).optional().default("fast"),
   versions: z.array(z.string()).optional(),
+  include: z
+    .array(
+      z.enum(["diagnostics", "facts", "findings", "recommendations", "circuits", "compilation"]),
+    )
+    .optional(),
+  circuit: z.string().optional(),
 });
 
 export const diffBodySchema = z.object({

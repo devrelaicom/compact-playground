@@ -65,6 +65,8 @@ jobs:
           echo "$HOME/.compact/bin" >> "$GITHUB_PATH"
           rm -rf /tmp/compact.tar.xz /tmp/compact-extract
       - name: Install compiler versions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           compact --version
           compact update 0.29.0

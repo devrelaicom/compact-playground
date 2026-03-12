@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analyzeSource } from "../../backend/src/analyzer.js";
+import { parseSource } from "../../backend/src/analysis/parser.js";
 import { diffContracts } from "../../backend/src/differ.js";
 import { CompileCache, generateCacheKey } from "../../backend/src/cache.js";
 import {
@@ -37,8 +37,8 @@ export circuit getBalance(): Uint<64> {
 }`;
 
     // Analyze both versions
-    const analysis1 = analyzeSource(v1);
-    const analysis2 = analyzeSource(v2);
+    const analysis1 = parseSource(v1);
+    const analysis2 = parseSource(v2);
 
     expect(analysis1.circuits).toHaveLength(1);
     expect(analysis2.circuits).toHaveLength(2);
