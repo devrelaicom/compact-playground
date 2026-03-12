@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { Context } from "hono";
-import { getClientIp, checkRateLimit } from "../backend/src/rate-limit.js";
+import { getClientIp, checkRateLimit, checkArchiveRateLimit } from "../backend/src/rate-limit.js";
 import { resetConfig } from "../backend/src/config.js";
 
 function mockContext(headers: Record<string, string> = {}, env?: Record<string, unknown>): Context {
@@ -168,5 +168,50 @@ describe("checkRateLimit", () => {
     // Window is 100ms; wait 150ms for it to expire
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(checkRateLimit("192.0.2.6")).toBe(true);
+  });
+});
+
+describe("checkArchiveRateLimit", () => {
+  beforeEach(() => {
+    process.env.ARCHIVE_RATE_LIMIT = "10";
+    process.env.ARCHIVE_RATE_WINDOW = "100";
+    resetConfig();
+  });
+
+  afterEach(() => {
+    delete process.env.ARCHIVE_RATE_LIMIT;
+    delete process.env.ARCHIVE_RATE_WINDOW;
+    resetConfig();
+  });
+
+  it("allows up to 10 requests per window", () => {
+    for (let i = 0; i < 10; i++) {
+      expect(checkArchiveRateLimit("10.0.0.1")).toBe(true);
+    }
+  });
+
+  it("rejects the 11th request", () => {
+    for (let i = 0; i < 10; i++) {
+      checkArchiveRateLimit("10.0.0.2");
+    }
+    expect(checkArchiveRateLimit("10.0.0.2")).toBe(false);
+  });
+
+  it("tracks IPs independently", () => {
+    for (let i = 0; i < 10; i++) {
+      checkArchiveRateLimit("10.0.0.3");
+    }
+    // IP .3 is exhausted; .4 should still be allowed
+    expect(checkArchiveRateLimit("10.0.0.4")).toBe(true);
+  });
+
+  it("resets after window expires", async () => {
+    for (let i = 0; i < 10; i++) {
+      checkArchiveRateLimit("10.0.0.5");
+    }
+    expect(checkArchiveRateLimit("10.0.0.5")).toBe(false);
+    // Window is 100ms; wait 150ms for it to expire
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(checkArchiveRateLimit("10.0.0.5")).toBe(true);
   });
 });

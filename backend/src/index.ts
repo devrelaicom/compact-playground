@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { getConfig } from "./config.js";
 import { compileRoutes } from "./routes/compile.js";
+import { archiveCompileRoutes } from "./routes/compile-archive.js";
 import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
@@ -29,6 +30,7 @@ app.use("*", validateRequestBody);
 
 // Mount routes
 app.route("/", compileRoutes);
+app.route("/", archiveCompileRoutes);
 app.route("/", formatRoutes);
 app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
@@ -46,6 +48,7 @@ app.get("/", (c) => {
       "POST /format": 'Format Compact code (versions: ["latest", "detect", or specific])',
       "POST /analyze":
         'Analyze contract structure (fast/deep, versions: ["latest", "detect", or specific])',
+      "POST /compile/archive": "Compile multi-file Compact archives (.tar.gz)",
       "POST /diff": "Semantic diff between contract versions",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
