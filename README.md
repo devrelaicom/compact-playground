@@ -10,7 +10,7 @@ Compile, format, analyze, and diff [Compact](https://docs.midnight.network/) sma
 
 - **Compile** contracts with automatic pragma/import wrapping for code snippets
 - **Format** code using the official Compact formatter
-- **Analyze** contract structure — extract circuits, ledger fields, imports, and pragma
+- **Analyze** contracts with a 5-stage pipeline — parse, semantic model, rules, recommendations, and per-circuit explanations
 - **Diff** two contract versions to detect structural changes
 - **Multi-version** compilation — test against multiple compiler versions in one request
 - **Version detection** — auto-select the right compiler from `pragma` constraints
@@ -122,16 +122,26 @@ curl http://localhost:8080/format \
 
 ### POST /analyze
 
-Analyze contract structure. Two modes:
+Run a 5-stage analysis pipeline on Compact source code: **parse → semantic model → rules → recommendations → circuit explanations**. Two modes:
 
-- **`fast`** — source-level parsing only (no compilation needed, version-independent)
-- **`deep`** — compiles the code first, then returns structure + compilation results
+- **`fast`** — source-level analysis only (no compilation needed, version-independent)
+- **`deep`** — analysis + compilation diagnostics from the Compact compiler
 
 ```bash
-# Fast mode — extract structure without compilation
+# Fast mode — full analysis without compilation
 curl http://localhost:8080/analyze \
   -H "Content-Type: application/json" \
-  -d '{"code": "export ledger counter: Counter;\nexport circuit increment(): [] { counter.increment(1); }", "mode": "fast"}'
+  -d '{"code": "export ledger counter: Counter;\nexport circuit increment(): [] { counter.increment(1n); }", "mode": "fast"}'
+
+# Filter response to specific sections
+curl http://localhost:8080/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"code": "...", "mode": "fast", "include": ["findings", "recommendations"]}'
+
+# Focus on a single circuit
+curl http://localhost:8080/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"code": "...", "mode": "fast", "circuit": "transfer"}'
 
 # Deep mode with version detection
 curl http://localhost:8080/analyze \
@@ -146,27 +156,68 @@ curl http://localhost:8080/analyze \
 | `code` | string | *required* | Compact source code |
 | `mode` | string | `"fast"` | `"fast"` or `"deep"` |
 | `versions` | string[] | — | Compiler versions (deep mode only) |
+| `include` | string[] | — | Filter response sections: `"diagnostics"`, `"facts"`, `"findings"`, `"recommendations"`, `"circuits"`, `"compilation"`. `summary` and `structure` are always returned. |
+| `circuit` | string | — | Focus analysis on a single circuit by name |
 
 **Response (fast):**
 ```json
 {
   "success": true,
   "mode": "fast",
-  "pragma": null,
-  "imports": [],
+  "diagnostics": [],
+  "summary": {
+    "hasLedger": true,
+    "hasCircuits": true,
+    "hasWitnesses": false,
+    "totalLines": 2,
+    "publicCircuits": 1,
+    "privateCircuits": 0,
+    "publicState": 1,
+    "privateState": 0
+  },
+  "structure": {
+    "imports": [],
+    "exports": ["counter", "increment"],
+    "ledger": [{"name": "counter", "type": "Counter", "isPrivate": false, "location": {"line": 1, "column": 0, "offset": 0}}],
+    "circuits": [{"name": "increment", "isPublic": true, "isPure": false, "parameters": [], "returnType": "[]", "location": {"line": 2, "column": 0, "offset": 31}}],
+    "witnesses": [],
+    "types": []
+  },
+  "facts": {
+    "hasStdLibImport": false,
+    "unusedWitnesses": []
+  },
+  "findings": [
+    {"code": "missing-stdlib-import", "severity": "warning", "message": "...", "suggestion": "..."}
+  ],
+  "recommendations": [
+    {"message": "...", "priority": "medium", "relatedFindings": ["missing-stdlib-import"]}
+  ],
   "circuits": [
     {
       "name": "increment",
-      "exported": true,
-      "pure": false,
-      "params": [],
-      "returnType": "[]",
-      "line": 2
+      "structure": {"isPublic": true, "isPure": false, "parameters": [], "returnType": "[]"},
+      "explanation": {"explanation": "...", "operations": ["..."], "zkImplications": ["..."], "privacyConsiderations": ["..."]},
+      "facts": {"readsPrivateState": false, "revealsPrivateData": false, "commitsData": false, "hashesData": false, "constrainsExecution": false, "mutatesLedger": true, "ledgerMutations": ["counter"]},
+      "findings": []
     }
-  ],
-  "ledger": [
-    {"name": "counter", "type": "Counter", "exported": true}
   ]
+}
+```
+
+**Response (deep)** includes a `compilation` field:
+```json
+{
+  "success": true,
+  "mode": "deep",
+  "compiler": {"available": true, "executionTime": 3200},
+  "compilation": {
+    "success": true,
+    "diagnostics": [],
+    "executionTime": 3200,
+    "compilerVersion": "0.29.0",
+    "languageVersion": "0.21.0"
+  }
 }
 ```
 
@@ -365,7 +416,6 @@ backend/src/
   index.ts            Server entry point (Hono)
   compiler.ts         Compilation engine
   formatter.ts        Code formatting
-  analyzer.ts         Contract structure extraction
   differ.ts           Semantic diffing
   parser.ts           Compiler error parsing
   wrapper.ts          Automatic pragma/import wrapping
@@ -374,6 +424,14 @@ backend/src/
   rate-limit.ts       Per-IP rate limiting
   config.ts           Environment config
   routes/             HTTP route handlers
+  analysis/           5-stage analysis pipeline
+    types.ts            Shared type definitions
+    parser.ts           Source code parser (stage 1)
+    semantic-model.ts   Semantic model builder (stage 2)
+    rules.ts            Analysis rules engine (stage 3)
+    recommendations.ts  Recommendation builder (stage 4)
+    explanations.ts     Circuit explanation builder (stage 5)
+    index.ts            Pipeline orchestrator
 frontend/
   compact-playground.js   mdBook integration script
   compact-playground.css  mdBook styles
