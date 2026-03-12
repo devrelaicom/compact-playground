@@ -7,6 +7,26 @@ API="http://localhost:8080"
 IMAGE="compact-playground-demo"
 CONTAINER="compact-playground-demo"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKIP_DOCKER=false
+
+# ─── Parse Arguments ─────────────────────────────────────────────────────────
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --url)
+      API="$2"
+      shift 2
+      ;;
+    --skip-docker)
+      SKIP_DOCKER=true
+      shift
+      ;;
+    *)
+      echo "Usage: $0 [--url <URL>] [--skip-docker]"
+      exit 1
+      ;;
+  esac
+done
 
 # Colors
 BOLD='\033[1m'
@@ -65,9 +85,11 @@ json_escape() {
 }
 
 cleanup() {
-  echo ""
-  echo -e "${DIM}Stopping container...${RESET}"
-  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  if [ "$SKIP_DOCKER" = false ]; then
+    echo ""
+    echo -e "${DIM}Stopping container...${RESET}"
+    docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  fi
 }
 
 # ─── Startup ──────────────────────────────────────────────────────────────────
@@ -76,34 +98,40 @@ trap cleanup EXIT
 
 banner "Compact Playground API Demo"
 
-echo "This demo builds the Docker image, starts the playground, and walks"
-echo "through each API endpoint interactively."
-echo ""
-pause
+if [ "$SKIP_DOCKER" = true ]; then
+  echo "Using server at $API (Docker skipped)"
+  echo ""
+  pause
+else
+  echo "This demo builds the Docker image, starts the playground, and walks"
+  echo "through each API endpoint interactively."
+  echo ""
+  pause
 
-section "Building Docker image"
-docker build -t "$IMAGE" "$SCRIPT_DIR/.." 2>&1 | tail -5
-echo ""
+  section "Building Docker image"
+  docker build -t "$IMAGE" "$SCRIPT_DIR/.." 2>&1 | tail -5
+  echo ""
 
-section "Starting container"
-docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-docker run -d --name "$CONTAINER" -p 8080:8080 "$IMAGE" >/dev/null
+  section "Starting container"
+  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  docker run -d --name "$CONTAINER" -p 8080:8080 "$IMAGE" >/dev/null
 
-echo "Waiting for server to be ready..."
-for i in $(seq 1 60); do
-  if curl -sf "$API/health" >/dev/null 2>&1; then
-    echo -e "${GREEN}Server is ready.${RESET}"
-    break
-  fi
-  if [ "$i" -eq 60 ]; then
-    echo -e "${RED}Server failed to start. Logs:${RESET}"
-    docker logs "$CONTAINER"
-    exit 1
-  fi
-  sleep 1
-done
-echo ""
-pause
+  echo "Waiting for server to be ready..."
+  for i in $(seq 1 60); do
+    if curl -sf "$API/health" >/dev/null 2>&1; then
+      echo -e "${GREEN}Server is ready.${RESET}"
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo -e "${RED}Server failed to start. Logs:${RESET}"
+      docker logs "$CONTAINER"
+      exit 1
+    fi
+    sleep 1
+  done
+  echo ""
+  pause
+fi
 
 # ─── 1. Health Check ─────────────────────────────────────────────────────────
 
@@ -390,5 +418,7 @@ echo "Special version values:"
 echo "  \"detect\" - Auto-select compiler based on pragma in source code"
 echo "  \"latest\" - Use the newest installed compiler"
 echo ""
-echo "The container will be stopped automatically."
+if [ "$SKIP_DOCKER" = false ]; then
+  echo "The container will be stopped automatically."
+fi
 echo ""
