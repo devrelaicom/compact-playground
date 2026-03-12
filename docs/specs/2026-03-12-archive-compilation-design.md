@@ -22,8 +22,10 @@ A new `POST /compile/archive` endpoint that accepts a `.tar.gz` archive containi
 | `entryPoint` | string | yes | Relative path to the main contract within the archive, e.g., `"MyContract.compact"` or `"src/MyContract.compact"` |
 | `options` | JSON string | no | `{ skipZk?: boolean, timeout?: number }` |
 
-- Compiler version is always detected from the pragma in the entry point file.
+- The language version pragma in the entry point is used to select a compatible installed compiler version via the existing `detectVersionFromPragma` logic. Manual compiler version override (`version`) is not supported.
 - No code wrapping is performed.
+- Multi-version compilation (`versions` parameter) is not supported in the initial implementation.
+- `options.timeout` overrides only the compilation timeout (matching existing behavior). The extraction timeout is not user-configurable.
 
 **Response:** Same shape as the existing single-version `/compile` response:
 
@@ -39,14 +41,14 @@ A new `POST /compile/archive` endpoint that accepts a `.tar.gz` archive containi
 }
 ```
 
-`originalCode` contains the content of the entry point file.
+`originalCode` contains the content of the entry point file. `wrappedCode` is always omitted since no wrapping occurs.
 
 ## Archive Validation & Extraction
 
 ### Upload limits (before extraction)
 
 - Max compressed archive size: 1 MB (enforced at the multipart parser level)
-- Content-type validation: must be `application/gzip` or `application/x-tar`
+- Archive format validation: validate the gzip magic bytes (`1f 8b`) of the uploaded stream rather than trusting the Content-Type header, since browsers and clients are inconsistent with MIME types for `.tar.gz` files
 
 ### Extraction limits (enforced per-entry during streaming)
 
@@ -61,15 +63,16 @@ A new `POST /compile/archive` endpoint that accepts a `.tar.gz` archive containi
 - Entry has an absolute path
 - Entry is a symlink, hardlink, device, or anything other than a regular file or directory
 - Filename contains null bytes, non-printable characters, or `..` path segments
-- File extension is not `.compact`
+- File extension is not `.compact` (this rule applies only to regular file entries, not directory entries)
 
 ### Extraction flow
 
 1. Stream the `.tar.gz` through `zlib.createGunzip()` piped to a tar parser
 2. For each entry, validate name/type/size against the rules above before writing to disk
 3. Write validated entries to `/tmp/compact-playground/{uuid}/`
-4. After extraction, verify the `entryPoint` exists within the extracted tree
-5. If any validation fails, clean up partial extraction and return 400
+4. Validate the `entryPoint` field for path traversal: verify that `path.resolve(extractDir, entryPoint)` starts with `extractDir`. Reject with 400 if not.
+5. After extraction, verify the `entryPoint` exists within the extracted tree
+6. If any validation fails, clean up partial extraction and return 400
 
 ## Compilation Flow
 
@@ -95,7 +98,7 @@ Stricter limits for archive compilation: 10 requests per 60 seconds per IP (vs 2
 
 ### Cache key integrity
 
-Hash the raw archive bytes (before extraction), not the extracted files. Simpler, deterministic, avoids TOCTOU issues.
+Hash the raw archive bytes (before extraction), not the extracted files. Simpler, deterministic, avoids TOCTOU issues. Use cache namespace `"compile-archive"` to distinguish from single-file compile results. A new `generateArchiveCacheKey(archiveBuffer: Buffer, version: string, options: object)` function is needed since the existing `generateCacheKey` normalizes string input, which would corrupt binary data.
 
 ### Cleanup guarantees
 
@@ -126,6 +129,9 @@ Configure the multipart parser with explicit limits: max fields (3), max files (
 | Uncompressed size exceeded | `"Archive exceeds maximum uncompressed size of 2MB"` |
 | Extraction timeout | `"Archive extraction timed out"` |
 | No pragma detected | `"Could not detect language version from pragma in entry point"` |
+| No compatible compiler version | `"No installed compiler version satisfies the pragma constraint '<constraint>' in the entry point"` |
+| Entry point path traversal | `"entryPoint path must not escape the archive root"` |
+| Archive contains no files | `"Archive contains no .compact files"` |
 
 ### Compilation errors (200 with `success: false`)
 
