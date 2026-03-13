@@ -15,6 +15,8 @@ export interface Config {
   maxCodeSize: number;
   trustCloudflare: boolean;
   trustProxy: boolean;
+  ozContractsPath: string;
+  ozSimulatorPath: string;
 }
 
 let _config: Config | null = null;
@@ -39,6 +41,8 @@ export function getConfig(): Config {
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
     trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",
     trustProxy: process.env.TRUST_PROXY === "true",
+    ozContractsPath: process.env.OZ_CONTRACTS_PATH || "/opt/oz-compact/contracts/src",
+    ozSimulatorPath: process.env.OZ_SIMULATOR_PATH || "/opt/oz-compact/packages/simulator",
   };
 
   return _config;
