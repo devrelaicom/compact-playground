@@ -9,6 +9,7 @@ export const compileBodySchema = z.object({
       skipZk: z.boolean().optional(),
       timeout: z.number().positive().optional(),
       version: z.string().optional(),
+      includeBindings: z.boolean().optional(),
     })
     .optional()
     .default({}),

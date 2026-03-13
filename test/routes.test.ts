@@ -157,6 +157,33 @@ describe("POST /compile", () => {
     expect(body.error).toBe("Rate limit exceeded");
   });
 
+  it("passes includeBindings option to compile", async () => {
+    const compileResult = {
+      success: true,
+      output: "Compilation successful",
+      compiledAt: "2024-01-01T00:00:00Z",
+      bindings: { "contract.ts": "export class Contract {}" },
+    };
+    mockCompile.mockResolvedValue(compileResult);
+
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "export circuit test(): [] {}",
+        options: { includeBindings: true },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.bindings).toEqual({ "contract.ts": "export class Contract {}" });
+    expect(mockCompile).toHaveBeenCalledWith(
+      "export circuit test(): [] {}",
+      expect.objectContaining({ includeBindings: true }),
+    );
+  });
+
   it("with versions array → 200, calls runMultiVersion", async () => {
     const multiVersionResults = [
       { version: "0.29.0", requestedVersion: "0.29.0", success: true },

@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { mkdir, writeFile, rm } from "fs/promises";
+import { mkdir, writeFile, rm, readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { wrapWithDefaults, hasPragma, getWrapperLineOffset } from "./wrapper.js";
@@ -14,6 +14,7 @@ export interface CompileOptions {
   skipZk?: boolean;
   timeout?: number;
   version?: string;
+  includeBindings?: boolean;
 }
 
 export interface CompileResult {
@@ -25,6 +26,7 @@ export interface CompileResult {
   originalCode?: string;
   wrappedCode?: string;
   executionTime?: number;
+  bindings?: Record<string, string>;
 }
 
 /**
@@ -49,6 +51,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       ? generateCacheKey(code, compilerVersion || "default", {
           wrapWithDefaults: options.wrapWithDefaults,
           skipZk: options.skipZk,
+          includeBindings: options.includeBindings,
         })
       : null;
 
@@ -90,8 +93,12 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       compileArgs.push(`+${compilerVersion}`);
     }
 
+    // When includeBindings is requested, we need full compilation (not --skip-zk)
+    // because --skip-zk only checks syntax and doesn't produce output artifacts
+    const effectiveSkipZk = options.includeBindings ? false : options.skipZk;
+
     // Use --skip-zk for faster compilation (syntax checking only)
-    if (options.skipZk !== false) {
+    if (effectiveSkipZk !== false) {
       compileArgs.push("--skip-zk");
     }
 
@@ -104,6 +111,16 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
     if (result.exitCode === 0) {
       // Success
       const warnings = parseCompilerErrors(result.stderr);
+
+      // Collect TypeScript bindings if requested
+      let bindings: Record<string, string> | undefined;
+      if (options.includeBindings) {
+        const collected = await collectBindings(outputDir);
+        if (Object.keys(collected).length > 0) {
+          bindings = collected;
+        }
+      }
+
       const compileResult: CompileResult = {
         success: true,
         output: "Compilation successful",
@@ -112,6 +129,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
         originalCode: needsWrapping ? code : undefined,
         wrappedCode: needsWrapping ? finalCode : undefined,
         executionTime,
+        bindings,
       };
 
       if (cache && cacheKey) {
@@ -159,6 +177,25 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       // Ignore cleanup errors
     }
   }
+}
+
+/**
+ * Reads all .ts files from the compiler output directory
+ */
+async function collectBindings(outputDir: string): Promise<Record<string, string>> {
+  const bindings: Record<string, string> = {};
+  try {
+    const entries = await readdir(outputDir, { recursive: true });
+    for (const entry of entries) {
+      if (entry.endsWith(".ts")) {
+        const content = await readFile(join(outputDir, entry), "utf-8");
+        bindings[entry] = content;
+      }
+    }
+  } catch {
+    // Output directory may not exist or be empty
+  }
+  return bindings;
 }
 
 interface CompilerOutput {
