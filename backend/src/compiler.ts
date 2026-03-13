@@ -33,6 +33,7 @@ export interface CompileResult {
   executionTime?: number;
   bindings?: Record<string, string>;
   insights?: CompilerInsights;
+  cacheKey?: string;
 }
 
 /**
@@ -140,6 +141,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
         executionTime,
         bindings,
         insights,
+        cacheKey: cacheKey ?? undefined,
       };
 
       if (cache && cacheKey) {

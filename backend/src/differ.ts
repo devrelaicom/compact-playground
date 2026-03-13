@@ -36,6 +36,7 @@ export interface DiffResult {
     added: string[];
     removed: string[];
   };
+  cacheKey?: string;
 }
 
 export async function diffContracts(before: string, after: string): Promise<DiffResult> {
@@ -127,6 +128,7 @@ export async function diffContracts(before: string, after: string): Promise<Diff
     ledger: { added: addedLedger, removed: removedLedger, modified: modifiedLedger },
     pragma: { before: beforeAnalysis.pragma, after: afterAnalysis.pragma, changed: pragmaChanged },
     imports: { added: addedImports, removed: removedImports },
+    cacheKey: cacheKey ?? undefined,
   };
 
   if (cache && cacheKey) {

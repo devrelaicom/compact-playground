@@ -271,6 +271,7 @@ export interface AnalysisResponse {
       requestedVersion: string;
     }
   >;
+  cacheKey?: string;
 }
 
 // ── Request Options ──────────────────────────────────────────────────
