@@ -145,27 +145,20 @@ export function parseCompilerInsights(output: string): CompilerInsights | null {
 
   const circuits: CircuitInsight[] = [];
 
-  // Match: circuit "name" (k=N, rows=N)
-  const fullPattern = /circuit\s+"([^"]+)"\s+\(k=(\d+),\s*rows=(\d+)\)/g;
-  // Match: Compiled circuit "name" (skip-zk mode, no metrics)
-  const nameOnlyPattern = /[Cc]ompiled\s+circuit\s+"([^"]+)"/g;
+  // Single pattern handles both formats:
+  // - Full: circuit "name" (k=N, rows=N)
+  // - Name-only (skip-zk): Compiled circuit "name"
+  const pattern = /[Cc](?:ompiled\s+)?ircuit\s+"([^"]+)"(?:\s+\(k=(\d+),\s*rows=(\d+)\))?/g;
 
   let match: RegExpExecArray | null;
 
-  // First try full pattern (with ZK metrics)
-  while ((match = fullPattern.exec(output)) !== null) {
-    circuits.push({
-      name: match[1],
-      k: parseInt(match[2], 10),
-      rows: parseInt(match[3], 10),
-    });
-  }
-
-  // If no full matches, try name-only pattern
-  if (circuits.length === 0) {
-    while ((match = nameOnlyPattern.exec(output)) !== null) {
-      circuits.push({ name: match[1] });
+  while ((match = pattern.exec(output)) !== null) {
+    const insight: CircuitInsight = { name: match[1] };
+    if (match[2]) {
+      insight.k = parseInt(match[2], 10);
+      insight.rows = parseInt(match[3], 10);
     }
+    circuits.push(insight);
   }
 
   if (circuits.length === 0) {
