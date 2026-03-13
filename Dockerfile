@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     xz-utils \
     unzip \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -66,6 +67,20 @@ RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
 
 # Verify installation
 RUN compact --version && compact list --installed
+
+# ── OpenZeppelin Compact Dependencies ──────────────────────────────────
+# Pin to a specific commit for reproducible builds
+ARG OZ_COMPACT_COMMIT=86e8e87b06b81dae26c52457939e7e97c2f09651
+
+# Clone the OZ compact-contracts repo at the pinned commit
+RUN git clone https://github.com/OpenZeppelin/compact-contracts.git /opt/oz-compact \
+    && cd /opt/oz-compact \
+    && git checkout $OZ_COMPACT_COMMIT \
+    && rm -rf .git .github
+
+# Set up OZ environment variables
+ENV OZ_CONTRACTS_PATH=/opt/oz-compact/contracts/src
+ENV OZ_SIMULATOR_PATH=/opt/oz-compact/packages/simulator
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
