@@ -10,6 +10,7 @@ import { diffRoutes } from "./routes/diff.js";
 import { visualizeRoutes } from "./routes/visualize.js";
 import { cachedResponseRoutes } from "./routes/cached-response.js";
 import { simulateRoutes } from "./routes/simulate.js";
+import { proveRoutes } from "./routes/prove.js";
 import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
@@ -38,6 +39,7 @@ app.route("/", diffRoutes);
 app.route("/", visualizeRoutes);
 app.route("/", cachedResponseRoutes);
 app.route("/", simulateRoutes);
+app.route("/", proveRoutes);
 
 app.route("/", healthRoutes);
 
@@ -61,6 +63,7 @@ app.get("/", (c) => {
       "POST /simulate/:sessionId/call": "Call a circuit on a deployed contract",
       "GET /simulate/:sessionId/state": "Get current session state",
       "DELETE /simulate/:sessionId": "End a simulation session",
+      "POST /prove": "Visualize ZK privacy boundaries and proof flow for a contract",
     },
   });
 });

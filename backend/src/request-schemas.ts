@@ -49,3 +49,8 @@ export const diffBodySchema = z.object({
 export const visualizeBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
 });
+
+export const proveBodySchema = z.object({
+  code: z.string().min(1, "Contract code is required"),
+  circuit: z.string().optional(),
+});
