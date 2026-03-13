@@ -659,6 +659,7 @@ describe("POST /visualize", () => {
 
 describe("GET /cached-response/:hash", () => {
   let app: Hono;
+  const validHash = "a".repeat(64); // valid SHA-256 hex
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -673,13 +674,13 @@ describe("GET /cached-response/:hash", () => {
     };
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
 
-    const res = await app.request("/cached-response/abc123", { method: "GET" });
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.output).toBe("cached result");
-    expect(mockCache.getByKey).toHaveBeenCalledWith("abc123");
+    expect(mockCache.getByKey).toHaveBeenCalledWith(validHash);
   });
 
   it("returns 404 when hash not found", async () => {
@@ -688,7 +689,7 @@ describe("GET /cached-response/:hash", () => {
     };
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
 
-    const res = await app.request("/cached-response/nonexistent", { method: "GET" });
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
@@ -699,7 +700,15 @@ describe("GET /cached-response/:hash", () => {
   it("returns 404 when caching is disabled", async () => {
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const res = await app.request("/cached-response/abc123", { method: "GET" });
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+  });
+
+  it("returns 404 for invalid hash format", async () => {
+    const res = await app.request("/cached-response/not-a-valid-hash", { method: "GET" });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
@@ -709,7 +718,7 @@ describe("GET /cached-response/:hash", () => {
   it("rate limited → 429", async () => {
     mockCheckRateLimit.mockReturnValue(false);
 
-    const res = await app.request("/cached-response/abc123", { method: "GET" });
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
 
     expect(res.status).toBe(429);
   });

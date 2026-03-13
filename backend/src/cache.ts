@@ -159,6 +159,7 @@ export class FileCache {
   async getByKey<T>(key: string): Promise<T | undefined> {
     const entry = this.index.get(key);
     if (!entry) {
+      this._misses++;
       return undefined;
     }
     return this.get<T>(entry.endpoint, key);
