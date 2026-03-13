@@ -12,6 +12,7 @@ import {
 import { getConfig } from "./config.js";
 import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
+import { linkLibraries } from "./libraries.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -20,6 +21,7 @@ export interface CompileOptions {
   timeout?: number;
   version?: string;
   includeBindings?: boolean;
+  libraries?: string[];
 }
 
 export interface CompileResult {
@@ -59,6 +61,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
           wrapWithDefaults: options.wrapWithDefaults,
           skipZk: options.skipZk,
           includeBindings: options.includeBindings,
+          libraries: options.libraries,
         })
       : null;
 
@@ -91,6 +94,11 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
     const outputDir = join(sessionDir, "output");
     await writeFile(sourceFile, finalCode, "utf-8");
     await mkdir(outputDir, { recursive: true });
+
+    // Link OZ library modules into the compilation directory if requested
+    if (options.libraries && options.libraries.length > 0) {
+      await linkLibraries(options.libraries, sessionDir);
+    }
 
     // Run the compiler via `compact compile [+VERSION] [FLAGS] <source> <output>`
     const compileArgs: string[] = ["compile"];

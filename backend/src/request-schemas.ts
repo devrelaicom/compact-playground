@@ -10,6 +10,7 @@ export const compileBodySchema = z.object({
       timeout: z.number().positive().optional(),
       version: z.string().optional(),
       includeBindings: z.boolean().optional(),
+      libraries: z.array(z.string()).optional(),
     })
     .optional()
     .default({}),
