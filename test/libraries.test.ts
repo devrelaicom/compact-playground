@@ -68,7 +68,9 @@ describe("libraries", () => {
       await mkdir(targetDir, { recursive: true });
 
       try {
-        await expect(linkLibraries(["nonexistent/Foo"], targetDir)).rejects.toThrow(/not found/i);
+        await expect(linkLibraries(["nonexistent/Foo"], targetDir)).rejects.toThrow(
+          /unknown library domain/i,
+        );
       } finally {
         await rm(targetDir, { recursive: true, force: true });
       }

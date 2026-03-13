@@ -55,12 +55,25 @@ export async function linkLibraries(libraries: string[], targetDir: string): Pro
 
   for (const lib of libraries) {
     const parts = lib.split("/");
+
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new Error(
+        `Invalid library path "${lib}". Use "domain/ModuleName" format (e.g., "access/Ownable").`,
+      );
+    }
+
     const domain = parts[0];
     const moduleName = parts[1];
 
-    if (!domain || !moduleName) {
+    // Validate domain against allowlist to prevent path traversal
+    if (!DOMAINS.includes(domain)) {
+      throw new Error(`Unknown library domain "${domain}". Valid domains: ${DOMAINS.join(", ")}.`);
+    }
+
+    // Reject path traversal in module name
+    if (moduleName.includes("..") || moduleName.includes("/") || moduleName.includes("\\")) {
       throw new Error(
-        `Invalid library path "${lib}". Use "domain/ModuleName" format (e.g., "access/Ownable").`,
+        `Invalid module name "${moduleName}". Module names must not contain path separators or ".."`,
       );
     }
 
@@ -87,16 +100,18 @@ export async function linkLibraries(libraries: string[], targetDir: string): Pro
   for (const domain of domainsNeeded) {
     const source = join(ozRoot, domain);
     const target = join(targetDir, domain);
+
+    // Skip domains whose source directory doesn't exist
     try {
       await fsAccess(source, constants.R_OK);
+    } catch {
+      continue;
+    }
+
+    try {
       await symlink(source, target, "dir");
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
-        try {
-          await fsAccess(source, constants.R_OK);
-        } catch {
-          continue;
-        }
         throw err;
       }
     }
