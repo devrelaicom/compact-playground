@@ -89,6 +89,8 @@ import { analyzeRoutes } from "../backend/src/routes/analyze.js";
 import { diffRoutes } from "../backend/src/routes/diff.js";
 import { visualizeRoutes } from "../backend/src/routes/visualize.js";
 import { healthRoutes, warmVersionsCache } from "../backend/src/routes/health.js";
+import { cachedResponseRoutes } from "../backend/src/routes/cached-response.js";
+import { getFileCache } from "../backend/src/cache.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
@@ -114,6 +116,7 @@ function createApp() {
   app.route("/", diffRoutes);
   app.route("/", visualizeRoutes);
   app.route("/", healthRoutes);
+  app.route("/", cachedResponseRoutes);
   return app;
 }
 
@@ -649,6 +652,64 @@ describe("POST /visualize", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: "test" }),
     });
+
+    expect(res.status).toBe(429);
+  });
+});
+
+describe("GET /cached-response/:hash", () => {
+  let app: Hono;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockCheckRateLimit.mockReturnValue(true);
+    mockGetClientIp.mockReturnValue("test-ip");
+    app = createApp();
+  });
+
+  it("returns cached data when hash exists", async () => {
+    const mockCache = {
+      getByKey: vi.fn().mockResolvedValue({ success: true, output: "cached result" }),
+    };
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
+
+    const res = await app.request("/cached-response/abc123", { method: "GET" });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    expect(body.output).toBe("cached result");
+    expect(mockCache.getByKey).toHaveBeenCalledWith("abc123");
+  });
+
+  it("returns 404 when hash not found", async () => {
+    const mockCache = {
+      getByKey: vi.fn().mockResolvedValue(undefined),
+    };
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
+
+    const res = await app.request("/cached-response/nonexistent", { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.message).toContain("not found");
+  });
+
+  it("returns 404 when caching is disabled", async () => {
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+    const res = await app.request("/cached-response/abc123", { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+  });
+
+  it("rate limited → 429", async () => {
+    mockCheckRateLimit.mockReturnValue(false);
+
+    const res = await app.request("/cached-response/abc123", { method: "GET" });
 
     expect(res.status).toBe(429);
   });

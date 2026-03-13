@@ -8,6 +8,7 @@ import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
 import { visualizeRoutes } from "./routes/visualize.js";
+import { cachedResponseRoutes } from "./routes/cached-response.js";
 import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
@@ -34,6 +35,7 @@ app.route("/", formatRoutes);
 app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
 app.route("/", visualizeRoutes);
+app.route("/", cachedResponseRoutes);
 
 app.route("/", healthRoutes);
 
@@ -52,6 +54,7 @@ app.get("/", (c) => {
       "POST /visualize": "Generate visual graph of contract architecture",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
+      "GET /cached-response/:hash": "Retrieve a cached response by its hash key",
     },
   });
 });
