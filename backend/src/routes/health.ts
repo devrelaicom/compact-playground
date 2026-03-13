@@ -9,6 +9,7 @@ import {
 } from "../version-manager.js";
 import { getConfig } from "../config.js";
 import { getFileCache } from "../cache.js";
+import { listAvailableLibraries } from "../libraries.js";
 
 const healthRoutes = new Hono();
 
@@ -92,6 +93,21 @@ healthRoutes.get("/versions", (c) => {
     return c.json({ error: "Version information not yet available" }, 503);
   }
   return c.json(cachedVersionsResponse);
+});
+
+healthRoutes.get("/libraries", async (c) => {
+  try {
+    const libraries = await listAvailableLibraries();
+    return c.json({ libraries });
+  } catch (error) {
+    return c.json(
+      {
+        error: "Failed to list libraries",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      500,
+    );
+  }
 });
 
 export { healthRoutes };
