@@ -9,6 +9,7 @@ import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
 import { visualizeRoutes } from "./routes/visualize.js";
 import { cachedResponseRoutes } from "./routes/cached-response.js";
+import { simulateRoutes } from "./routes/simulate.js";
 import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
@@ -22,7 +23,7 @@ app.use(
   "*",
   cors({
     origin: "*",
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
   }),
 );
@@ -36,6 +37,7 @@ app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
 app.route("/", visualizeRoutes);
 app.route("/", cachedResponseRoutes);
+app.route("/", simulateRoutes);
 
 app.route("/", healthRoutes);
 
@@ -55,6 +57,10 @@ app.get("/", (c) => {
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
       "GET /cached-response/:hash": "Retrieve a cached response by its hash key",
+      "POST /simulate/deploy": "Deploy a contract for simulation",
+      "POST /simulate/:sessionId/call": "Call a circuit on a deployed contract",
+      "GET /simulate/:sessionId/state": "Get current session state",
+      "DELETE /simulate/:sessionId": "End a simulation session",
     },
   });
 });
