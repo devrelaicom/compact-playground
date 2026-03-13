@@ -63,7 +63,8 @@ proveRoutes.post("/prove", async (c) => {
     return c.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred",
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "An unknown error occurred",
       },
       500,
     );

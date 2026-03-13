@@ -241,21 +241,18 @@ function buildPrivacyBoundary(
 
 function describeConstraint(expr: string): string {
   const trimmed = expr.trim();
-  if (trimmed.includes(">=")) {
-    const [left, right] = trimmed.split(">=").map((s) => s.trim());
-    return `${left} must be greater than or equal to ${right}`;
-  }
-  if (trimmed.includes("<=")) {
-    const [left, right] = trimmed.split("<=").map((s) => s.trim());
-    return `${left} must be less than or equal to ${right}`;
-  }
-  if (trimmed.includes("!=")) {
-    const [left, right] = trimmed.split("!=").map((s) => s.trim());
-    return `${left} must not equal ${right}`;
-  }
-  if (trimmed.includes("==")) {
-    const [left, right] = trimmed.split("==").map((s) => s.trim());
-    return `${left} must equal ${right}`;
+  for (const [op, desc] of [
+    [">=", "must be greater than or equal to"],
+    ["<=", "must be less than or equal to"],
+    ["!=", "must not equal"],
+    ["==", "must equal"],
+  ] as const) {
+    if (trimmed.includes(op)) {
+      const parts = trimmed.split(op).map((s) => s.trim());
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        return `${parts[0]} ${desc} ${parts[1]}`;
+      }
+    }
   }
   return `Constraint: ${trimmed}`;
 }
@@ -266,8 +263,8 @@ function buildConstraints(
 ): ConstraintDescription[] {
   const constraints: ConstraintDescription[] = [];
 
-  // Extract assert expressions from body
-  const assertRegex = /assert\s*\(([^)]+)\)/g;
+  // Extract assert expressions from body (handles one level of nested parens)
+  const assertRegex = /assert\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
   let match;
   while ((match = assertRegex.exec(parsed.body)) !== null) {
     const expr = match[1];
@@ -304,6 +301,22 @@ function buildProofFlow(
   ledgerFields: ParsedLedgerField[],
 ): ProofFlowStep[] {
   const steps: ProofFlowStep[] = [];
+
+  // Pure circuits don't generate proofs
+  if (parsed.isPure) {
+    steps.push({
+      actor: "prover",
+      action: "Compute result",
+      detail: `Pure circuit '${parsed.name}' computes the result directly — no proof needed`,
+      dataVisible: operations.readsLedger.filter((f) => {
+        const field = ledgerFields.find((l) => l.name === f);
+        return field?.isExported;
+      }),
+      dataHidden: [],
+    });
+    return steps;
+  }
+
   const paramNames = parsed.parameters.map((p) => p.name);
   const publicFields = ledgerFields
     .filter((l) => l.isExported && operations.readsLedger.includes(l.name))
