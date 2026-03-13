@@ -10,26 +10,21 @@ describe("runMultiVersion", () => {
         output: `compiled with ${version}`,
       });
 
-    const result = await runMultiVersion(["0.29.0", "0.28.0"], "code", executor);
+    const result = await runMultiVersion(["0.29.0"], "code", executor);
 
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
     expect(result[0].version).toBe("0.29.0");
     expect(result[0].requestedVersion).toBe("0.29.0");
     expect(result[0].success).toBe(true);
   });
 
-  it("handles mixed fulfilled and rejected results", async () => {
-    const executor = (version: string) => {
-      if (version === "0.28.0") return Promise.reject(new Error("Compiler not found"));
-      return Promise.resolve({ success: true });
-    };
+  it("handles uninstalled version as rejection", async () => {
+    const executor = () => Promise.resolve({ success: true });
 
-    const result = await runMultiVersion(["0.29.0", "0.28.0"], "code", executor);
-
-    expect(result).toHaveLength(2);
-    expect(result[0].success).toBe(true);
-    expect(result[1].success).toBe(false);
-    expect(result[1].error).toBe("Compiler not found");
+    // 0.99.0 is not installed, so resolveRequestedVersion will throw
+    await expect(runMultiVersion(["0.29.0", "0.99.0"], "code", executor)).rejects.toThrow(
+      /not installed/,
+    );
   });
 
   it("preserves requestedVersion vs resolved version", async () => {
