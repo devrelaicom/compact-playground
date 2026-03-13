@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { Hono } from "hono";
 import { getCompilerVersion } from "../utils.js";
 import {
@@ -57,6 +58,9 @@ healthRoutes.get("/health", async (c) => {
   const fileCache = getFileCache();
   const cacheStats = fileCache ? fileCache.stats() : null;
 
+  const ozContractsInstalled = existsSync(config.ozContractsPath);
+  const ozSimulatorInstalled = existsSync(config.ozSimulatorPath);
+
   return c.json({
     status: cliInstalled && defaultVersionValid ? "healthy" : "degraded",
     compactCli: {
@@ -69,6 +73,16 @@ healthRoutes.get("/health", async (c) => {
       valid: defaultVersionValid,
     },
     cache: cacheStats,
+    ozDependencies: {
+      contracts: {
+        installed: ozContractsInstalled,
+        path: config.ozContractsPath,
+      },
+      simulator: {
+        installed: ozSimulatorInstalled,
+        path: config.ozSimulatorPath,
+      },
+    },
     timestamp: new Date().toISOString(),
   });
 });
