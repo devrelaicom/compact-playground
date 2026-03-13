@@ -15,6 +15,7 @@ interface DeployResult {
   circuits?: CircuitInfo[];
   ledgerState?: LedgerState;
   error?: string;
+  errorCode?: "CAPACITY_EXCEEDED";
 }
 
 interface CallResult {
@@ -24,6 +25,7 @@ interface CallResult {
   ledgerState?: LedgerState;
   callHistory?: CircuitCallRecord[];
   error?: string;
+  errorCode?: "SESSION_NOT_FOUND" | "CIRCUIT_NOT_FOUND";
 }
 
 export function deployContract(request: DeployRequest): Promise<DeployResult> {
@@ -58,6 +60,13 @@ function _deployContract(request: DeployRequest): DeployResult {
     }
 
     const session = createSession(request.code, circuits, initialLedger);
+    if (!session) {
+      return {
+        success: false,
+        error: "Too many active sessions. Try again later.",
+        errorCode: "CAPACITY_EXCEEDED",
+      };
+    }
     if (request.caller) {
       session.caller = request.caller;
     }
@@ -83,7 +92,11 @@ export function callCircuit(sessionId: string, request: CallRequest): Promise<Ca
 function _callCircuit(sessionId: string, request: CallRequest): CallResult {
   const session = getSession(sessionId);
   if (!session) {
-    return { success: false, error: "Session not found or expired" };
+    return {
+      success: false,
+      error: "Session not found or expired",
+      errorCode: "SESSION_NOT_FOUND",
+    };
   }
 
   const circuit = session.circuits.find((c) => c.name === request.circuit);
@@ -92,6 +105,7 @@ function _callCircuit(sessionId: string, request: CallRequest): CallResult {
     return {
       success: false,
       error: `Circuit "${request.circuit}" not found. Available: ${available}`,
+      errorCode: "CIRCUIT_NOT_FOUND",
     };
   }
 
@@ -99,6 +113,7 @@ function _callCircuit(sessionId: string, request: CallRequest): CallResult {
 
   if (!circuit.isPure) {
     for (const field of circuit.writesLedger) {
+      if (!(field in session.ledgerState)) continue;
       const current = session.ledgerState[field];
       const previousValue = current.value;
       const newValue = simulateMutation(current, request.parameters);

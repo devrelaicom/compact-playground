@@ -2,14 +2,27 @@ import { randomUUID } from "crypto";
 import type { SimulationSession, CircuitInfo, LedgerState } from "./types.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_SESSIONS = 100;
 
 const sessions = new Map<string, SimulationSession>();
+
+// Periodic cleanup of expired sessions (every 5 minutes)
+setInterval(
+  () => {
+    cleanupExpired();
+  },
+  5 * 60 * 1000,
+).unref();
 
 export function createSession(
   code: string,
   circuits: CircuitInfo[],
   initialLedger: LedgerState,
-): SimulationSession {
+): SimulationSession | null {
+  if (sessions.size >= MAX_SESSIONS) {
+    cleanupExpired();
+    if (sessions.size >= MAX_SESSIONS) return null;
+  }
   const now = Date.now();
   const session: SimulationSession = {
     id: randomUUID(),

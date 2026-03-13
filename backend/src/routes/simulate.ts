@@ -31,6 +31,9 @@ simulateRoutes.post("/simulate/deploy", async (c) => {
   }
 
   const result = await deployContract(parsed.data);
+  if (!result.success && result.errorCode === "CAPACITY_EXCEEDED") {
+    return c.json(result, 503);
+  }
   return c.json(result, result.success ? 200 : 400);
 });
 
@@ -49,7 +52,7 @@ simulateRoutes.post("/simulate/:sessionId/call", async (c) => {
   }
 
   const result = await callCircuit(sessionId, parsed.data);
-  if (!result.success && result.error?.includes("Session")) {
+  if (!result.success && result.errorCode === "SESSION_NOT_FOUND") {
     return c.json(result, 404);
   }
   return c.json(result, result.success ? 200 : 400);

@@ -8,6 +8,12 @@ import {
   resetSessions,
 } from "../../backend/src/simulator/session-manager.js";
 
+function mustCreateSession(...args: Parameters<typeof createSession>) {
+  const session = createSession(...args);
+  if (!session) throw new Error("Expected session to be created");
+  return session;
+}
+
 describe("session-manager", () => {
   beforeEach(() => {
     resetSessions();
@@ -18,15 +24,14 @@ describe("session-manager", () => {
   });
 
   it("creates a session with a unique ID and expiry", () => {
-    const session = createSession("code1", [], {});
-    expect(session.id).toBeDefined();
+    const session = mustCreateSession("code1", [], {});
     expect(session.id).toHaveLength(36); // UUID format
     expect(session.code).toBe("code1");
     expect(session.expiresAt).toBeGreaterThan(Date.now());
   });
 
   it("retrieves a session by ID", () => {
-    const session = createSession("code2", [], {});
+    const session = mustCreateSession("code2", [], {});
     const retrieved = getSession(session.id);
     expect(retrieved).toBeDefined();
     expect(retrieved?.code).toBe("code2");
@@ -37,14 +42,14 @@ describe("session-manager", () => {
   });
 
   it("deletes a session", () => {
-    const session = createSession("code3", [], {});
+    const session = mustCreateSession("code3", [], {});
     deleteSession(session.id);
     expect(getSession(session.id)).toBeUndefined();
   });
 
   it("does not return expired sessions", () => {
     vi.useFakeTimers();
-    const session = createSession("code4", [], {});
+    const session = mustCreateSession("code4", [], {});
     vi.advanceTimersByTime(16 * 60 * 1000);
     expect(getSession(session.id)).toBeUndefined();
     vi.useRealTimers();
