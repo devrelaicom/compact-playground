@@ -155,6 +155,15 @@ export class FileCache {
     }
   }
 
+  /** Look up a cached entry by key alone (uses index to find endpoint) */
+  async getByKey<T>(key: string): Promise<T | undefined> {
+    const entry = this.index.get(key);
+    if (!entry) {
+      return undefined;
+    }
+    return this.get<T>(entry.endpoint, key);
+  }
+
   async set(endpoint: string, key: string, data: unknown): Promise<void> {
     const path = this.filePath(endpoint, key);
     const envelope: CacheEnvelope<unknown> = {

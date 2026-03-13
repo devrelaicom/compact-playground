@@ -109,6 +109,40 @@ describe("FileCache", () => {
   });
 });
 
+describe("FileCache.getByKey", () => {
+  let tempDir: string;
+  let cache: FileCache;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "filecache-getbykey-test-"));
+    cache = new FileCache(tempDir, 60000, 100, 1000);
+    await cache.init();
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("returns data when key exists in index", async () => {
+    const data = { result: "hello" };
+    await cache.set("compile", "key1", data);
+    expect(await cache.getByKey("key1")).toEqual(data);
+  });
+
+  it("returns undefined for unknown key", async () => {
+    expect(await cache.getByKey("nonexistent")).toBeUndefined();
+  });
+
+  it("returns undefined for expired key", async () => {
+    const shortTtlCache = new FileCache(tempDir, 1, 100, 1000); // 1ms TTL
+    await shortTtlCache.init();
+    await shortTtlCache.set("compile", "key1", { value: "test" });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await shortTtlCache.getByKey("key1")).toBeUndefined();
+  });
+});
+
 describe("normalizeForCacheKey", () => {
   it("trims whitespace", () => {
     expect(normalizeForCacheKey("  code  ")).toBe(normalizeForCacheKey("code"));
