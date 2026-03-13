@@ -3,7 +3,12 @@ import { mkdir, writeFile, rm, readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { wrapWithDefaults, hasPragma, getWrapperLineOffset } from "./wrapper.js";
-import { parseCompilerErrors, CompilerError } from "./parser.js";
+import {
+  parseCompilerErrors,
+  CompilerError,
+  parseCompilerInsights,
+  CompilerInsights,
+} from "./parser.js";
 import { getConfig } from "./config.js";
 import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
@@ -27,6 +32,7 @@ export interface CompileResult {
   wrappedCode?: string;
   executionTime?: number;
   bindings?: Record<string, string>;
+  insights?: CompilerInsights;
 }
 
 /**
@@ -121,6 +127,9 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
         }
       }
 
+      // Parse compilation insights from compiler output
+      const insights = parseCompilerInsights(result.stderr) ?? undefined;
+
       const compileResult: CompileResult = {
         success: true,
         output: "Compilation successful",
@@ -130,6 +139,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
         wrappedCode: needsWrapping ? finalCode : undefined,
         executionTime,
         bindings,
+        insights,
       };
 
       if (cache && cacheKey) {

@@ -184,6 +184,36 @@ describe("POST /compile", () => {
     );
   });
 
+  it("returns insights field when compile result includes insights", async () => {
+    const compileResult = {
+      success: true,
+      output: "Compilation successful",
+      compiledAt: "2024-01-01T00:00:00Z",
+      insights: {
+        circuitCount: 2,
+        circuits: [
+          { name: "transfer", k: 11, rows: 1180 },
+          { name: "approve", k: 8, rows: 512 },
+        ],
+        usesZkProofs: true,
+      },
+    };
+    mockCompile.mockResolvedValue(compileResult);
+
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "export circuit test(): [] {}" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.insights).toBeDefined();
+    const insights = body.insights as Record<string, unknown>;
+    expect(insights.circuitCount).toBe(2);
+    expect(insights.usesZkProofs).toBe(true);
+  });
+
   it("with versions array → 200, calls runMultiVersion", async () => {
     const multiVersionResults = [
       { version: "0.29.0", requestedVersion: "0.29.0", success: true },

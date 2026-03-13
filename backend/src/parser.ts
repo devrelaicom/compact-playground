@@ -122,6 +122,63 @@ export function parseCompilerErrors(output: string): CompilerError[] {
   });
 }
 
+export interface CircuitInsight {
+  name: string;
+  k?: number;
+  rows?: number;
+}
+
+export interface CompilerInsights {
+  circuitCount: number;
+  circuits: CircuitInsight[];
+  usesZkProofs: boolean;
+}
+
+/**
+ * Parses compiler output to extract circuit compilation insights.
+ * Returns null if no circuit information is found.
+ */
+export function parseCompilerInsights(output: string): CompilerInsights | null {
+  if (!output || output.trim() === "") {
+    return null;
+  }
+
+  const circuits: CircuitInsight[] = [];
+
+  // Match: circuit "name" (k=N, rows=N)
+  const fullPattern = /circuit\s+"([^"]+)"\s+\(k=(\d+),\s*rows=(\d+)\)/g;
+  // Match: Compiled circuit "name" (skip-zk mode, no metrics)
+  const nameOnlyPattern = /[Cc]ompiled\s+circuit\s+"([^"]+)"/g;
+
+  let match: RegExpExecArray | null;
+
+  // First try full pattern (with ZK metrics)
+  while ((match = fullPattern.exec(output)) !== null) {
+    circuits.push({
+      name: match[1],
+      k: parseInt(match[2], 10),
+      rows: parseInt(match[3], 10),
+    });
+  }
+
+  // If no full matches, try name-only pattern
+  if (circuits.length === 0) {
+    while ((match = nameOnlyPattern.exec(output)) !== null) {
+      circuits.push({ name: match[1] });
+    }
+  }
+
+  if (circuits.length === 0) {
+    return null;
+  }
+
+  return {
+    circuitCount: circuits.length,
+    circuits,
+    usesZkProofs: circuits.some((c) => c.k !== undefined),
+  };
+}
+
 /**
  * Formats errors for display
  */
