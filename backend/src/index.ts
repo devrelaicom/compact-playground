@@ -7,6 +7,7 @@ import { compileRoutes } from "./routes/compile.js";
 import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
+import { visualizeRoutes } from "./routes/visualize.js";
 import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
@@ -32,6 +33,7 @@ app.route("/", compileRoutes);
 app.route("/", formatRoutes);
 app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
+app.route("/", visualizeRoutes);
 
 app.route("/", healthRoutes);
 
@@ -47,6 +49,7 @@ app.get("/", (c) => {
       "POST /analyze":
         'Analyze contract structure (fast/deep, versions: ["latest", "detect", or specific])',
       "POST /diff": "Semantic diff between contract versions",
+      "POST /visualize": "Generate visual graph of contract architecture",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
     },

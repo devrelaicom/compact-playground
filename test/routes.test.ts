@@ -17,6 +17,18 @@ vi.mock("../backend/src/differ.js", () => ({
   diffContracts: vi.fn(),
 }));
 
+vi.mock("../backend/src/visualizer.js", () => ({
+  generateContractGraph: vi.fn(),
+}));
+
+vi.mock("../backend/src/analysis/parser.js", () => ({
+  parseSource: vi.fn(),
+}));
+
+vi.mock("../backend/src/analysis/semantic-model.js", () => ({
+  buildSemanticModel: vi.fn(),
+}));
+
 vi.mock("../backend/src/rate-limit.js", () => ({
   checkRateLimit: vi.fn(() => true),
   getClientIp: vi.fn(() => "test-ip"),
@@ -55,6 +67,9 @@ import { compile } from "../backend/src/compiler.js";
 import { formatCode } from "../backend/src/formatter.js";
 import { analyzeContract } from "../backend/src/analysis/index.js";
 import { diffContracts } from "../backend/src/differ.js";
+import { generateContractGraph } from "../backend/src/visualizer.js";
+import { parseSource } from "../backend/src/analysis/parser.js";
+import { buildSemanticModel } from "../backend/src/analysis/semantic-model.js";
 import { checkRateLimit, getClientIp } from "../backend/src/rate-limit.js";
 import { getCompilerVersion } from "../backend/src/utils.js";
 import { getConfig } from "../backend/src/config.js";
@@ -72,12 +87,16 @@ import { compileRoutes } from "../backend/src/routes/compile.js";
 import { formatRoutes } from "../backend/src/routes/format.js";
 import { analyzeRoutes } from "../backend/src/routes/analyze.js";
 import { diffRoutes } from "../backend/src/routes/diff.js";
+import { visualizeRoutes } from "../backend/src/routes/visualize.js";
 import { healthRoutes, warmVersionsCache } from "../backend/src/routes/health.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
 const mockAnalyzeContract = analyzeContract as ReturnType<typeof vi.fn>;
 const mockDiffContracts = diffContracts as ReturnType<typeof vi.fn>;
+const mockGenerateContractGraph = generateContractGraph as ReturnType<typeof vi.fn>;
+const mockParseSource = parseSource as ReturnType<typeof vi.fn>;
+const mockBuildSemanticModel = buildSemanticModel as ReturnType<typeof vi.fn>;
 const mockCheckRateLimit = checkRateLimit as ReturnType<typeof vi.fn>;
 const mockGetClientIp = getClientIp as ReturnType<typeof vi.fn>;
 const mockGetCompilerVersion = getCompilerVersion as ReturnType<typeof vi.fn>;
@@ -93,6 +112,7 @@ function createApp() {
   app.route("/", formatRoutes);
   app.route("/", analyzeRoutes);
   app.route("/", diffRoutes);
+  app.route("/", visualizeRoutes);
   app.route("/", healthRoutes);
   return app;
 }
@@ -575,5 +595,61 @@ describe("GET /versions", () => {
     expect(installed).toHaveLength(2);
     expect(installed[0].version).toBe("0.29.0");
     expect(installed[0].languageVersion).toBe("1.0");
+  });
+});
+
+describe("POST /visualize", () => {
+  let app: Hono;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockCheckRateLimit.mockReturnValue(true);
+    mockGetClientIp.mockReturnValue("test-ip");
+    mockParseSource.mockReturnValue({});
+    mockBuildSemanticModel.mockReturnValue({});
+    app = createApp();
+  });
+
+  it("valid code → 200, returns graph", async () => {
+    const graphResult = {
+      nodes: [{ id: "circuit:test", type: "circuit", label: "test" }],
+      edges: [],
+      groups: [],
+      mermaid: 'graph TD\n  circuit_test[["test()"]]',
+    };
+    mockGenerateContractGraph.mockReturnValue(graphResult);
+
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "export circuit test(): [] {}" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    expect(body.graph).toBeDefined();
+  });
+
+  it("missing code → 400", async () => {
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("rate limited → 429", async () => {
+    mockCheckRateLimit.mockReturnValue(false);
+
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "test" }),
+    });
+
+    expect(res.status).toBe(429);
   });
 });

@@ -44,3 +44,7 @@ export const diffBodySchema = z.object({
   before: z.string().min(1, "'before' code is required"),
   after: z.string().min(1, "'after' code is required"),
 });
+
+export const visualizeBodySchema = z.object({
+  code: z.string().min(1, "Code is required"),
+});
