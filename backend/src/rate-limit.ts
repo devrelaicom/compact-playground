@@ -16,6 +16,21 @@ setInterval(
   5 * 60 * 1000,
 ).unref();
 
+const archiveRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+// Sweep expired archive rate-limit entries every 5 minutes
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [ip, record] of archiveRateLimitMap) {
+      if (now > record.resetTime) {
+        archiveRateLimitMap.delete(ip);
+      }
+    }
+  },
+  5 * 60 * 1000,
+).unref();
+
 export function checkRateLimit(ip: string): boolean {
   const config = getConfig();
   const now = Date.now();
@@ -27,6 +42,24 @@ export function checkRateLimit(ip: string): boolean {
   }
 
   if (record.count >= config.rateLimit) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
+export function checkArchiveRateLimit(ip: string): boolean {
+  const config = getConfig();
+  const now = Date.now();
+  const record = archiveRateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    archiveRateLimitMap.set(ip, { count: 1, resetTime: now + config.archiveRateWindow });
+    return true;
+  }
+
+  if (record.count >= config.archiveRateLimit) {
     return false;
   }
 

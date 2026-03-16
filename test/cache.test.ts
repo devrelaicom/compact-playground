@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
-import { FileCache, normalizeForCacheKey, generateCacheKey } from "../backend/src/cache.js";
+import {
+  FileCache,
+  normalizeForCacheKey,
+  generateCacheKey,
+  generateArchiveCacheKey,
+} from "../backend/src/cache.js";
 
 describe("FileCache", () => {
   let tempDir: string;
@@ -109,6 +114,40 @@ describe("FileCache", () => {
   });
 });
 
+describe("FileCache.getByKey", () => {
+  let tempDir: string;
+  let cache: FileCache;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "filecache-getbykey-test-"));
+    cache = new FileCache(tempDir, 60000, 100, 1000);
+    await cache.init();
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("returns data when key exists in index", async () => {
+    const data = { result: "hello" };
+    await cache.set("compile", "key1", data);
+    expect(await cache.getByKey("key1")).toEqual(data);
+  });
+
+  it("returns undefined for unknown key", async () => {
+    expect(await cache.getByKey("nonexistent")).toBeUndefined();
+  });
+
+  it("returns undefined for expired key", async () => {
+    const shortTtlCache = new FileCache(tempDir, 1, 100, 1000); // 1ms TTL
+    await shortTtlCache.init();
+    await shortTtlCache.set("compile", "key1", { value: "test" });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await shortTtlCache.getByKey("key1")).toBeUndefined();
+  });
+});
+
 describe("normalizeForCacheKey", () => {
   it("trims whitespace", () => {
     expect(normalizeForCacheKey("  code  ")).toBe(normalizeForCacheKey("code"));
@@ -141,6 +180,35 @@ describe("generateCacheKey", () => {
   it("produces different keys for different options", () => {
     const a = generateCacheKey("code", "0.26.0", { skipZk: true });
     const b = generateCacheKey("code", "0.26.0", { skipZk: false });
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("generateArchiveCacheKey", () => {
+  const archive = Buffer.from("fake archive content");
+
+  it("produces deterministic keys for same input", () => {
+    const a = generateArchiveCacheKey(archive, "0.26.0", { optimize: true });
+    const b = generateArchiveCacheKey(archive, "0.26.0", { optimize: true });
+    expect(a).toBe(b);
+  });
+
+  it("produces different keys for different archive buffers", () => {
+    const other = Buffer.from("different archive content");
+    const a = generateArchiveCacheKey(archive, "0.26.0", {});
+    const b = generateArchiveCacheKey(other, "0.26.0", {});
+    expect(a).not.toBe(b);
+  });
+
+  it("produces different keys for different versions", () => {
+    const a = generateArchiveCacheKey(archive, "0.26.0", {});
+    const b = generateArchiveCacheKey(archive, "0.25.0", {});
+    expect(a).not.toBe(b);
+  });
+
+  it("produces different keys for different options", () => {
+    const a = generateArchiveCacheKey(archive, "0.26.0", { optimize: true });
+    const b = generateArchiveCacheKey(archive, "0.26.0", { optimize: false });
     expect(a).not.toBe(b);
   });
 });

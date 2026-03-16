@@ -122,6 +122,56 @@ export function parseCompilerErrors(output: string): CompilerError[] {
   });
 }
 
+export interface CircuitInsight {
+  name: string;
+  k?: number;
+  rows?: number;
+}
+
+export interface CompilerInsights {
+  circuitCount: number;
+  circuits: CircuitInsight[];
+  usesZkProofs: boolean;
+}
+
+/**
+ * Parses compiler output to extract circuit compilation insights.
+ * Returns null if no circuit information is found.
+ */
+export function parseCompilerInsights(output: string): CompilerInsights | null {
+  if (!output || output.trim() === "") {
+    return null;
+  }
+
+  const circuits: CircuitInsight[] = [];
+
+  // Single pattern handles both formats:
+  // - Full: circuit "name" (k=N, rows=N)
+  // - Name-only (skip-zk): Compiled circuit "name"
+  const pattern = /[Cc](?:ompiled\s+)?ircuit\s+"([^"]+)"(?:\s+\(k=(\d+),\s*rows=(\d+)\))?/g;
+
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(output)) !== null) {
+    const insight: CircuitInsight = { name: match[1] };
+    if (match[2]) {
+      insight.k = parseInt(match[2], 10);
+      insight.rows = parseInt(match[3], 10);
+    }
+    circuits.push(insight);
+  }
+
+  if (circuits.length === 0) {
+    return null;
+  }
+
+  return {
+    circuitCount: circuits.length,
+    circuits,
+    usesZkProofs: circuits.some((c) => c.k !== undefined),
+  };
+}
+
 /**
  * Formats errors for display
  */

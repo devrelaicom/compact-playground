@@ -1,0 +1,8 @@
+pragma language_version >= 0.21;
+
+import CompactStandardLibrary;
+import "access/Ownable" prefix Ownable_;
+
+export circuit getContractOwner(): Either<ZswapCoinPublicKey, ContractAddress> {
+  return Ownable_owner();
+}

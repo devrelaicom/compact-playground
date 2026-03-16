@@ -13,8 +13,12 @@ export interface Config {
   cacheTtl: number;
   maxVersionsPerRequest: number;
   maxCodeSize: number;
+  archiveRateLimit: number;
+  archiveRateWindow: number;
   trustCloudflare: boolean;
   trustProxy: boolean;
+  ozContractsPath: string;
+  ozSimulatorPath: string;
 }
 
 let _config: Config | null = null;
@@ -37,8 +41,12 @@ export function getConfig(): Config {
     cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
     maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "10", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
+    archiveRateLimit: parseInt(process.env.ARCHIVE_RATE_LIMIT || "10", 10),
+    archiveRateWindow: parseInt(process.env.ARCHIVE_RATE_WINDOW || "60000", 10),
     trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",
     trustProxy: process.env.TRUST_PROXY === "true",
+    ozContractsPath: process.env.OZ_CONTRACTS_PATH || "/opt/oz-compact/contracts/src",
+    ozSimulatorPath: process.env.OZ_SIMULATOR_PATH || "/opt/oz-compact/packages/simulator",
   };
 
   return _config;

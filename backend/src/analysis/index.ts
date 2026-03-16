@@ -177,6 +177,7 @@ export async function analyzeContract(
     findings,
     recommendations,
     circuits: circuitAnalyses,
+    cacheKey: cacheKey ?? undefined,
   };
 
   // Deep mode: add compilation

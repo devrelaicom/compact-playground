@@ -1,0 +1,18 @@
+pragma language_version >= 0.21;
+
+import CompactStandardLibrary;
+import MathLib prefix MathLib_;
+
+export ledger vaultBalance: Uint<64>;
+
+export circuit deposit(amount: Uint<64>): [] {
+  vaultBalance = disclose(MathLib_add(vaultBalance, amount));
+}
+
+export circuit withdraw(amount: Uint<64>): [] {
+  vaultBalance = disclose(MathLib_subtract(vaultBalance, amount));
+}
+
+export circuit getVaultBalance(): Uint<64> {
+  return vaultBalance;
+}

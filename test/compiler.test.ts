@@ -85,6 +85,52 @@ export circuit increment(): [] {
     expect(result2.compiledAt).toBe(result1.compiledAt);
   }, 60000);
 
+  it("returns TypeScript bindings when includeBindings is true", async () => {
+    const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+  return (a + b) as Uint<64>;
+}`;
+    const result = await compile(code, { includeBindings: true });
+    expect(result.success).toBe(true);
+    expect(result.bindings).toBeDefined();
+    expect(typeof result.bindings).toBe("object");
+    const bindings = result.bindings ?? {};
+    const filenames = Object.keys(bindings);
+    expect(filenames.length).toBeGreaterThan(0);
+    expect(filenames.some((f) => f.endsWith(".ts"))).toBe(true);
+    for (const content of Object.values(bindings)) {
+      expect(typeof content).toBe("string");
+      expect(content.length).toBeGreaterThan(0);
+    }
+  }, 60000);
+
+  it("does not return bindings when includeBindings is false/absent", async () => {
+    const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+  return (a + b) as Uint<64>;
+}`;
+    const result = await compile(code);
+    expect(result.success).toBe(true);
+    expect(result.bindings).toBeUndefined();
+  }, 60000);
+
+  it("does not return bindings on compilation failure even if includeBindings is true", async () => {
+    const result = await compile("this is not valid compact code", { includeBindings: true });
+    expect(result.success).toBe(false);
+    expect(result.bindings).toBeUndefined();
+  }, 60000);
+
+  it("caches bindings and non-bindings results separately", async () => {
+    const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
+  return (a + b) as Uint<64>;
+}`;
+    const resultWithout = await compile(code);
+    expect(resultWithout.success).toBe(true);
+    expect(resultWithout.bindings).toBeUndefined();
+
+    const resultWith = await compile(code, { includeBindings: true });
+    expect(resultWith.success).toBe(true);
+    expect(resultWith.bindings).toBeDefined();
+  }, 60000);
+
   it("does not return cached result after resetFileCache with new dir", async () => {
     const code = `export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;

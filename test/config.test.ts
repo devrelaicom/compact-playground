@@ -59,4 +59,24 @@ describe("config", () => {
     const b = getConfig();
     expect(a).toBe(b);
   });
+
+  it("returns default OZ paths when no env vars set", () => {
+    delete process.env.OZ_CONTRACTS_PATH;
+    delete process.env.OZ_SIMULATOR_PATH;
+
+    const config = getConfig();
+
+    expect(config.ozContractsPath).toBe("/opt/oz-compact/contracts/src");
+    expect(config.ozSimulatorPath).toBe("/opt/oz-compact/packages/simulator");
+  });
+
+  it("reads OZ paths from environment variables", () => {
+    process.env.OZ_CONTRACTS_PATH = "/custom/oz/contracts";
+    process.env.OZ_SIMULATOR_PATH = "/custom/oz/simulator";
+
+    const config = getConfig();
+
+    expect(config.ozContractsPath).toBe("/custom/oz/contracts");
+    expect(config.ozSimulatorPath).toBe("/custom/oz/simulator");
+  });
 });

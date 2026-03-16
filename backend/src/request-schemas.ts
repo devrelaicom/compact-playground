@@ -9,6 +9,8 @@ export const compileBodySchema = z.object({
       skipZk: z.boolean().optional(),
       timeout: z.number().positive().optional(),
       version: z.string().optional(),
+      includeBindings: z.boolean().optional(),
+      libraries: z.array(z.string().max(100)).max(20).optional(),
     })
     .optional()
     .default({}),
@@ -42,4 +44,13 @@ export const analyzeBodySchema = z.object({
 export const diffBodySchema = z.object({
   before: z.string().min(1, "'before' code is required"),
   after: z.string().min(1, "'after' code is required"),
+});
+
+export const visualizeBodySchema = z.object({
+  code: z.string().min(1, "Code is required"),
+});
+
+export const proveBodySchema = z.object({
+  code: z.string().min(1, "Contract code is required"),
+  circuit: z.string().optional(),
 });

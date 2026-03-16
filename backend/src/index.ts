@@ -4,9 +4,14 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { getConfig } from "./config.js";
 import { compileRoutes } from "./routes/compile.js";
+import { archiveCompileRoutes } from "./routes/compile-archive.js";
 import { formatRoutes } from "./routes/format.js";
 import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
+import { visualizeRoutes } from "./routes/visualize.js";
+import { cachedResponseRoutes } from "./routes/cached-response.js";
+import { simulateRoutes } from "./routes/simulate.js";
+import { proveRoutes } from "./routes/prove.js";
 import { validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
@@ -20,7 +25,7 @@ app.use(
   "*",
   cors({
     origin: "*",
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
   }),
 );
@@ -29,9 +34,14 @@ app.use("*", validateRequestBody);
 
 // Mount routes
 app.route("/", compileRoutes);
+app.route("/", archiveCompileRoutes);
 app.route("/", formatRoutes);
 app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
+app.route("/", visualizeRoutes);
+app.route("/", cachedResponseRoutes);
+app.route("/", simulateRoutes);
+app.route("/", proveRoutes);
 
 app.route("/", healthRoutes);
 
@@ -46,9 +56,17 @@ app.get("/", (c) => {
       "POST /format": 'Format Compact code (versions: ["latest", "detect", or specific])',
       "POST /analyze":
         'Analyze contract structure (fast/deep, versions: ["latest", "detect", or specific])',
+      "POST /compile/archive": "Compile multi-file Compact archives (.tar.gz)",
       "POST /diff": "Semantic diff between contract versions",
+      "POST /visualize": "Generate visual graph of contract architecture",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
+      "GET /cached-response/:hash": "Retrieve a cached response by its hash key",
+      "POST /simulate/deploy": "Deploy a contract for simulation",
+      "POST /simulate/:sessionId/call": "Call a circuit on a deployed contract",
+      "GET /simulate/:sessionId/state": "Get current session state",
+      "DELETE /simulate/:sessionId": "End a simulation session",
+      "POST /prove": "Visualize ZK privacy boundaries and proof flow for a contract",
     },
   });
 });

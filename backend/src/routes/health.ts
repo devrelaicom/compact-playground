@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { Hono } from "hono";
 import { getCompilerVersion } from "../utils.js";
 import {
@@ -8,6 +9,7 @@ import {
 } from "../version-manager.js";
 import { getConfig } from "../config.js";
 import { getFileCache } from "../cache.js";
+import { listAvailableLibraries } from "../libraries.js";
 
 const healthRoutes = new Hono();
 
@@ -57,6 +59,9 @@ healthRoutes.get("/health", async (c) => {
   const fileCache = getFileCache();
   const cacheStats = fileCache ? fileCache.stats() : null;
 
+  const ozContractsInstalled = existsSync(config.ozContractsPath);
+  const ozSimulatorInstalled = existsSync(config.ozSimulatorPath);
+
   return c.json({
     status: cliInstalled && defaultVersionValid ? "healthy" : "degraded",
     compactCli: {
@@ -69,6 +74,16 @@ healthRoutes.get("/health", async (c) => {
       valid: defaultVersionValid,
     },
     cache: cacheStats,
+    ozDependencies: {
+      contracts: {
+        installed: ozContractsInstalled,
+        path: config.ozContractsPath,
+      },
+      simulator: {
+        installed: ozSimulatorInstalled,
+        path: config.ozSimulatorPath,
+      },
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -78,6 +93,21 @@ healthRoutes.get("/versions", (c) => {
     return c.json({ error: "Version information not yet available" }, 503);
   }
   return c.json(cachedVersionsResponse);
+});
+
+healthRoutes.get("/libraries", async (c) => {
+  try {
+    const libraries = await listAvailableLibraries();
+    return c.json({ libraries });
+  } catch (error) {
+    return c.json(
+      {
+        error: "Failed to list libraries",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      500,
+    );
+  }
 });
 
 export { healthRoutes };

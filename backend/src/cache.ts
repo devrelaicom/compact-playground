@@ -8,6 +8,18 @@ export function normalizeForCacheKey(code: string): string {
   return code.trim().replace(/\r\n/g, "\n");
 }
 
+/** Generate a deterministic cache key from raw archive bytes + version + options */
+export function generateArchiveCacheKey(
+  archiveBuffer: Buffer,
+  version: string,
+  options: Record<string, unknown>,
+): string {
+  return createHash("sha256")
+    .update(archiveBuffer)
+    .update(JSON.stringify({ version, options }))
+    .digest("hex");
+}
+
 /** Generate a deterministic cache key from code + version + options */
 export function generateCacheKey(
   code: string,
@@ -48,7 +60,7 @@ export class FileCache {
 
   /** Rebuild index from disk, delete expired entries */
   async init(): Promise<void> {
-    const endpoints = ["compile", "format", "analyze", "diff"];
+    const endpoints = ["compile", "format", "analyze", "diff", "compile-archive"];
 
     for (const endpoint of endpoints) {
       const endpointDir = join(this.baseDir, endpoint);
@@ -153,6 +165,16 @@ export class FileCache {
       this._misses++;
       return undefined;
     }
+  }
+
+  /** Look up a cached entry by key alone (uses index to find endpoint) */
+  async getByKey<T>(key: string): Promise<T | undefined> {
+    const entry = this.index.get(key);
+    if (!entry) {
+      this._misses++;
+      return undefined;
+    }
+    return this.get<T>(entry.endpoint, key);
   }
 
   async set(endpoint: string, key: string, data: unknown): Promise<void> {

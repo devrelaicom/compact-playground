@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseCompilerErrors, formatErrors } from "../backend/src/parser.js";
+import { parseCompilerErrors, formatErrors, parseCompilerInsights } from "../backend/src/parser.js";
 
 describe("compiler error parser", () => {
   describe("parseCompilerErrors", () => {
@@ -152,6 +152,90 @@ Exception: contract.compact line 5 char 12:
       const formatted = formatErrors(errors);
 
       expect(formatted.split("\n")).toHaveLength(2);
+    });
+  });
+
+  describe("parseCompilerInsights", () => {
+    it("returns null for empty input", () => {
+      expect(parseCompilerInsights("")).toBeNull();
+      expect(parseCompilerInsights("   ")).toBeNull();
+    });
+
+    it("parses circuit names and k-value from compiler output", () => {
+      const output = `Compiling contract.compact
+circuit "transfer" (k=11, rows=1180)
+circuit "approve" (k=8, rows=512)
+Compilation complete`;
+
+      const insights = parseCompilerInsights(output);
+
+      expect(insights).not.toBeNull();
+      const result = insights as NonNullable<typeof insights>;
+      expect(result.circuitCount).toBe(2);
+      expect(result.circuits).toHaveLength(2);
+      expect(result.circuits[0]).toEqual({
+        name: "transfer",
+        k: 11,
+        rows: 1180,
+      });
+      expect(result.circuits[1]).toEqual({
+        name: "approve",
+        k: 8,
+        rows: 512,
+      });
+      expect(result.usesZkProofs).toBe(true);
+    });
+
+    it("handles output with no circuit metrics", () => {
+      const output = `Compiling contract.compact
+Compilation complete`;
+
+      const insights = parseCompilerInsights(output);
+
+      expect(insights).toBeNull();
+    });
+
+    it("parses circuit names without k-value (skip-zk mode)", () => {
+      const output = `Compiling contract.compact
+Compiled circuit "transfer"
+Compiled circuit "approve"
+Compilation complete`;
+
+      const insights = parseCompilerInsights(output);
+
+      expect(insights).not.toBeNull();
+      const result = insights as NonNullable<typeof insights>;
+      expect(result.circuitCount).toBe(2);
+      expect(result.circuits).toHaveLength(2);
+      expect(result.circuits[0]).toEqual({ name: "transfer" });
+      expect(result.circuits[1]).toEqual({ name: "approve" });
+      expect(result.usesZkProofs).toBe(false);
+    });
+
+    it("handles single circuit", () => {
+      const output = `circuit "increment" (k=5, rows=200)`;
+
+      const insights = parseCompilerInsights(output);
+
+      expect(insights).not.toBeNull();
+      const result = insights as NonNullable<typeof insights>;
+      expect(result.circuitCount).toBe(1);
+      expect(result.circuits[0].name).toBe("increment");
+      expect(result.circuits[0].k).toBe(5);
+      expect(result.circuits[0].rows).toBe(200);
+    });
+
+    it("handles mixed output with errors interspersed", () => {
+      const output = `Warning: unused variable
+circuit "transfer" (k=11, rows=1180)
+Some other output`;
+
+      const insights = parseCompilerInsights(output);
+
+      expect(insights).not.toBeNull();
+      const result = insights as NonNullable<typeof insights>;
+      expect(result.circuitCount).toBe(1);
+      expect(result.circuits[0].name).toBe("transfer");
     });
   });
 });
