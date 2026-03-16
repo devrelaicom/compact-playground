@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
-import { mkdir } from "fs/promises";
+import { mkdir, symlink, stat } from "fs/promises";
 import { join } from "path";
+import { homedir } from "os";
 import { getConfig } from "./config.js";
 
 export interface ParsedVersion {
@@ -347,7 +348,27 @@ async function doInstall(
   versionDir: string,
   config: ReturnType<typeof getConfig>,
 ): Promise<string> {
-  await mkdir(versionDir, { recursive: true });
+  // Create the versions subdirectory inside the per-version compact home
+  const versionsSubdir = join(versionDir, "versions");
+  await mkdir(versionsSubdir, { recursive: true });
+
+  // Symlink the version's binaries from the global compact home so that
+  // `compact update --directory` can find them. The global home is either
+  // COMPACT_DIRECTORY (if set) or ~/.compact.
+  const globalHome = process.env.COMPACT_DIRECTORY || join(homedir(), ".compact");
+  const globalVersionDir = join(globalHome, "versions", version);
+  const localVersionDir = join(versionsSubdir, version);
+
+  try {
+    await stat(localVersionDir);
+  } catch {
+    try {
+      await stat(globalVersionDir);
+      await symlink(globalVersionDir, localVersionDir);
+    } catch {
+      // Global version dir doesn't exist — compact update will attempt to download
+    }
+  }
 
   return new Promise((resolve, reject) => {
     const proc = spawn(config.compactCliPath, ["update", version, "--directory", versionDir], {

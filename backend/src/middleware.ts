@@ -11,6 +11,11 @@ export async function validateRequestBody(c: Context, next: Next) {
     return next();
   }
 
+  // Skip JSON parsing for multipart endpoints
+  if (c.req.path === "/compile/archive") {
+    return next();
+  }
+
   const config = getConfig();
 
   let body: Record<string, unknown>;

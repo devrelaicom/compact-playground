@@ -227,7 +227,7 @@ interface CompilerOutput {
 /**
  * Runs the compact compiler with the given arguments
  */
-async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
+export async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
   return new Promise((resolve, reject) => {
     const compactCli = getConfig().compactCliPath;
 
