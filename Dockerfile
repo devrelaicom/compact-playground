@@ -16,6 +16,16 @@ COPY backend/ ./backend/
 # Build TypeScript
 RUN npm run build
 
+# OZ Compact dependencies stage — clone in a lightweight image, keep git out of production
+FROM alpine/git AS oz-clone
+ARG OZ_COMPACT_COMMIT=86e8e87b06b81dae26c52457939e7e97c2f09651
+RUN git init /opt/oz-compact \
+    && cd /opt/oz-compact \
+    && git remote add origin https://github.com/OpenZeppelin/compact-contracts.git \
+    && git fetch --depth 1 origin $OZ_COMPACT_COMMIT \
+    && git checkout FETCH_HEAD \
+    && rm -rf .git .github
+
 # Production stage
 FROM node:25-slim AS production
 
@@ -66,6 +76,14 @@ RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
 
 # Verify installation
 RUN compact --version && compact list --installed
+
+# ── OpenZeppelin Compact Dependencies ──────────────────────────────────
+# Copied from oz-clone stage (pinned commit, no .git overhead)
+COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
+
+# Set up OZ environment variables
+ENV OZ_CONTRACTS_PATH=/opt/oz-compact/contracts/src
+ENV OZ_SIMULATOR_PATH=/opt/oz-compact/packages/simulator
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist

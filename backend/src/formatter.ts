@@ -17,6 +17,7 @@ export interface FormatResult {
   changed?: boolean;
   diff?: string;
   error?: string;
+  cacheKey?: string;
 }
 
 export async function formatCode(code: string, options: FormatOptions = {}): Promise<FormatResult> {
@@ -86,6 +87,7 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
       success: true,
       formatted,
       changed,
+      cacheKey: cacheKey ?? undefined,
     };
 
     if (changed) {

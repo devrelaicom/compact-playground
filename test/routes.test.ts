@@ -17,6 +17,18 @@ vi.mock("../backend/src/differ.js", () => ({
   diffContracts: vi.fn(),
 }));
 
+vi.mock("../backend/src/visualizer.js", () => ({
+  generateContractGraph: vi.fn(),
+}));
+
+vi.mock("../backend/src/analysis/parser.js", () => ({
+  parseSource: vi.fn(),
+}));
+
+vi.mock("../backend/src/analysis/semantic-model.js", () => ({
+  buildSemanticModel: vi.fn(),
+}));
+
 vi.mock("../backend/src/rate-limit.js", () => ({
   checkRateLimit: vi.fn(() => true),
   getClientIp: vi.fn(() => "test-ip"),
@@ -55,6 +67,9 @@ import { compile } from "../backend/src/compiler.js";
 import { formatCode } from "../backend/src/formatter.js";
 import { analyzeContract } from "../backend/src/analysis/index.js";
 import { diffContracts } from "../backend/src/differ.js";
+import { generateContractGraph } from "../backend/src/visualizer.js";
+import { parseSource } from "../backend/src/analysis/parser.js";
+import { buildSemanticModel } from "../backend/src/analysis/semantic-model.js";
 import { checkRateLimit, getClientIp } from "../backend/src/rate-limit.js";
 import { getCompilerVersion } from "../backend/src/utils.js";
 import { getConfig } from "../backend/src/config.js";
@@ -72,12 +87,18 @@ import { compileRoutes } from "../backend/src/routes/compile.js";
 import { formatRoutes } from "../backend/src/routes/format.js";
 import { analyzeRoutes } from "../backend/src/routes/analyze.js";
 import { diffRoutes } from "../backend/src/routes/diff.js";
+import { visualizeRoutes } from "../backend/src/routes/visualize.js";
 import { healthRoutes, warmVersionsCache } from "../backend/src/routes/health.js";
+import { cachedResponseRoutes } from "../backend/src/routes/cached-response.js";
+import { getFileCache } from "../backend/src/cache.js";
 
 const mockCompile = compile as ReturnType<typeof vi.fn>;
 const mockFormatCode = formatCode as ReturnType<typeof vi.fn>;
 const mockAnalyzeContract = analyzeContract as ReturnType<typeof vi.fn>;
 const mockDiffContracts = diffContracts as ReturnType<typeof vi.fn>;
+const mockGenerateContractGraph = generateContractGraph as ReturnType<typeof vi.fn>;
+const mockParseSource = parseSource as ReturnType<typeof vi.fn>;
+const mockBuildSemanticModel = buildSemanticModel as ReturnType<typeof vi.fn>;
 const mockCheckRateLimit = checkRateLimit as ReturnType<typeof vi.fn>;
 const mockGetClientIp = getClientIp as ReturnType<typeof vi.fn>;
 const mockGetCompilerVersion = getCompilerVersion as ReturnType<typeof vi.fn>;
@@ -93,7 +114,9 @@ function createApp() {
   app.route("/", formatRoutes);
   app.route("/", analyzeRoutes);
   app.route("/", diffRoutes);
+  app.route("/", visualizeRoutes);
   app.route("/", healthRoutes);
+  app.route("/", cachedResponseRoutes);
   return app;
 }
 
@@ -155,6 +178,63 @@ describe("POST /compile", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(false);
     expect(body.error).toBe("Rate limit exceeded");
+  });
+
+  it("passes includeBindings option to compile", async () => {
+    const compileResult = {
+      success: true,
+      output: "Compilation successful",
+      compiledAt: "2024-01-01T00:00:00Z",
+      bindings: { "contract.ts": "export class Contract {}" },
+    };
+    mockCompile.mockResolvedValue(compileResult);
+
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "export circuit test(): [] {}",
+        options: { includeBindings: true },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.bindings).toEqual({ "contract.ts": "export class Contract {}" });
+    expect(mockCompile).toHaveBeenCalledWith(
+      "export circuit test(): [] {}",
+      expect.objectContaining({ includeBindings: true }),
+    );
+  });
+
+  it("returns insights field when compile result includes insights", async () => {
+    const compileResult = {
+      success: true,
+      output: "Compilation successful",
+      compiledAt: "2024-01-01T00:00:00Z",
+      insights: {
+        circuitCount: 2,
+        circuits: [
+          { name: "transfer", k: 11, rows: 1180 },
+          { name: "approve", k: 8, rows: 512 },
+        ],
+        usesZkProofs: true,
+      },
+    };
+    mockCompile.mockResolvedValue(compileResult);
+
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "export circuit test(): [] {}" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.insights).toBeDefined();
+    const insights = body.insights as Record<string, unknown>;
+    expect(insights.circuitCount).toBe(2);
+    expect(insights.usesZkProofs).toBe(true);
   });
 
   it("with versions array → 200, calls runMultiVersion", async () => {
@@ -518,5 +598,128 @@ describe("GET /versions", () => {
     expect(installed).toHaveLength(2);
     expect(installed[0].version).toBe("0.29.0");
     expect(installed[0].languageVersion).toBe("1.0");
+  });
+});
+
+describe("POST /visualize", () => {
+  let app: Hono;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockCheckRateLimit.mockReturnValue(true);
+    mockGetClientIp.mockReturnValue("test-ip");
+    mockParseSource.mockReturnValue({});
+    mockBuildSemanticModel.mockReturnValue({});
+    app = createApp();
+  });
+
+  it("valid code → 200, returns graph", async () => {
+    const graphResult = {
+      nodes: [{ id: "circuit:test", type: "circuit", label: "test" }],
+      edges: [],
+      groups: [],
+      mermaid: 'graph TD\n  circuit_test[["test()"]]',
+    };
+    mockGenerateContractGraph.mockReturnValue(graphResult);
+
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "export circuit test(): [] {}" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    expect(body.graph).toBeDefined();
+  });
+
+  it("missing code → 400", async () => {
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("rate limited → 429", async () => {
+    mockCheckRateLimit.mockReturnValue(false);
+
+    const res = await app.request("/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "test" }),
+    });
+
+    expect(res.status).toBe(429);
+  });
+});
+
+describe("GET /cached-response/:hash", () => {
+  let app: Hono;
+  const validHash = "a".repeat(64); // valid SHA-256 hex
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockCheckRateLimit.mockReturnValue(true);
+    mockGetClientIp.mockReturnValue("test-ip");
+    app = createApp();
+  });
+
+  it("returns cached data when hash exists", async () => {
+    const mockCache = {
+      getByKey: vi.fn().mockResolvedValue({ success: true, output: "cached result" }),
+    };
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
+
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    expect(body.output).toBe("cached result");
+    expect(mockCache.getByKey).toHaveBeenCalledWith(validHash);
+  });
+
+  it("returns 404 when hash not found", async () => {
+    const mockCache = {
+      getByKey: vi.fn().mockResolvedValue(undefined),
+    };
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
+
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.message).toContain("not found");
+  });
+
+  it("returns 404 when caching is disabled", async () => {
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+  });
+
+  it("returns 404 for invalid hash format", async () => {
+    const res = await app.request("/cached-response/not-a-valid-hash", { method: "GET" });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+  });
+
+  it("rate limited → 429", async () => {
+    mockCheckRateLimit.mockReturnValue(false);
+
+    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+
+    expect(res.status).toBe(429);
   });
 });
