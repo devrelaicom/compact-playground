@@ -44,6 +44,8 @@ export function getSession(id: string): SimulationSession | undefined {
     sessions.delete(id);
     return undefined;
   }
+  // Refresh TTL on access (inactivity-based expiry)
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
   return session;
 }
 
