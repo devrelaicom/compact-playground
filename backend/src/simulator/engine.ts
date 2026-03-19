@@ -3,38 +3,23 @@ import { buildSemanticModel } from "../analysis/semantic-model.js";
 import type {
   CircuitInfo,
   LedgerState,
-  CircuitCallRecord,
+  StateChange,
   DeployRequest,
   CallRequest,
+  SimulationResult,
 } from "./types.js";
 import { createSession, getSession } from "./session-manager.js";
 
-interface DeployResult {
-  success: boolean;
-  sessionId?: string;
-  circuits?: CircuitInfo[];
-  ledgerState?: LedgerState;
-  error?: string;
-  errorCode?: "CAPACITY_EXCEEDED";
-}
-
-interface CallResult {
-  success: boolean;
-  circuit?: string;
-  stateChanges?: CircuitCallRecord["stateChanges"];
-  ledgerState?: LedgerState;
-  callHistory?: CircuitCallRecord[];
-  error?: string;
-  errorCode?: "SESSION_NOT_FOUND" | "CIRCUIT_NOT_FOUND";
-}
-
-export function deployContract(request: DeployRequest): Promise<DeployResult> {
+export function deployContract(request: DeployRequest): Promise<SimulationResult> {
   return Promise.resolve(_deployContract(request));
 }
 
-function _deployContract(request: DeployRequest): DeployResult {
+function _deployContract(request: DeployRequest): SimulationResult {
   if (!request.code || request.code.trim().length === 0) {
-    return { success: false, error: "Contract code is required" };
+    return {
+      success: false,
+      errors: [{ message: "Contract code is required", severity: "error" }],
+    };
   }
 
   try {
@@ -63,8 +48,13 @@ function _deployContract(request: DeployRequest): DeployResult {
     if (!session) {
       return {
         success: false,
-        error: "Too many active sessions. Try again later.",
-        errorCode: "CAPACITY_EXCEEDED",
+        errors: [
+          {
+            message: "Too many active sessions. Try again later.",
+            severity: "error",
+            errorCode: "CAPACITY_EXCEEDED",
+          },
+        ],
       };
     }
     if (request.caller) {
@@ -76,26 +66,39 @@ function _deployContract(request: DeployRequest): DeployResult {
       sessionId: session.id,
       circuits,
       ledgerState: session.ledgerState,
+      callHistory: [],
+      expiresAt: new Date(session.expiresAt).toISOString(),
     };
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to parse contract",
+      errors: [
+        {
+          message: err instanceof Error ? err.message : "Failed to parse contract",
+          severity: "error",
+        },
+      ],
     };
   }
 }
 
-export function callCircuit(sessionId: string, request: CallRequest): Promise<CallResult> {
+export function callCircuit(sessionId: string, request: CallRequest): Promise<SimulationResult> {
   return Promise.resolve(_callCircuit(sessionId, request));
 }
 
-function _callCircuit(sessionId: string, request: CallRequest): CallResult {
+function _callCircuit(sessionId: string, request: CallRequest): SimulationResult {
   const session = getSession(sessionId);
   if (!session) {
     return {
       success: false,
-      error: "Session not found or expired",
-      errorCode: "SESSION_NOT_FOUND",
+      sessionId,
+      errors: [
+        {
+          message: "Session not found or expired",
+          severity: "error",
+          errorCode: "SESSION_NOT_FOUND",
+        },
+      ],
     };
   }
 
@@ -104,12 +107,18 @@ function _callCircuit(sessionId: string, request: CallRequest): CallResult {
     const available = session.circuits.map((c) => c.name).join(", ");
     return {
       success: false,
-      error: `Circuit "${request.circuit}" not found. Available: ${available}`,
-      errorCode: "CIRCUIT_NOT_FOUND",
+      sessionId,
+      errors: [
+        {
+          message: `Circuit "${request.circuit}" not found. Available: ${available}`,
+          severity: "error",
+          errorCode: "CIRCUIT_NOT_FOUND",
+        },
+      ],
     };
   }
 
-  const stateChanges: CircuitCallRecord["stateChanges"] = [];
+  const stateChanges: StateChange[] = [];
 
   if (!circuit.isPure) {
     for (const field of circuit.writesLedger) {
@@ -128,22 +137,26 @@ function _callCircuit(sessionId: string, request: CallRequest): CallResult {
     }
   }
 
-  const record: CircuitCallRecord = {
+  session.callHistory.push({
     circuit: request.circuit,
     parameters: request.parameters ?? {},
     caller: request.caller ?? session.caller,
     timestamp: Date.now(),
     stateChanges,
-  };
+  });
 
-  session.callHistory.push(record);
+  // Return circuits with stateChanges populated on the called circuit
+  const circuits = session.circuits.map((c) =>
+    c.name === request.circuit ? { ...c, stateChanges } : c,
+  );
 
   return {
     success: true,
-    circuit: request.circuit,
-    stateChanges,
+    sessionId,
+    circuits,
     ledgerState: session.ledgerState,
     callHistory: session.callHistory,
+    expiresAt: new Date(session.expiresAt).toISOString(),
   };
 }
 

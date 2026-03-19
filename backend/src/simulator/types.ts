@@ -1,5 +1,14 @@
+import type { SimulationError } from "../types.js";
+
 export interface LedgerState {
   [field: string]: { type: string; value: string };
+}
+
+export interface StateChange {
+  field: string;
+  operation: string;
+  previousValue: string;
+  newValue: string;
 }
 
 export interface CircuitInfo {
@@ -10,6 +19,7 @@ export interface CircuitInfo {
   returnType: string;
   readsLedger: string[];
   writesLedger: string[];
+  stateChanges?: StateChange[];
 }
 
 export interface SimulationSession {
@@ -28,12 +38,7 @@ export interface CircuitCallRecord {
   parameters: Record<string, string>;
   caller?: string;
   timestamp: number;
-  stateChanges: Array<{
-    field: string;
-    operation: string;
-    previousValue: string;
-    newValue: string;
-  }>;
+  stateChanges: StateChange[];
 }
 
 export interface DeployRequest {
@@ -45,4 +50,14 @@ export interface CallRequest {
   circuit: string;
   parameters?: Record<string, string>;
   caller?: string;
+}
+
+export interface SimulationResult {
+  success: boolean;
+  errors?: SimulationError[];
+  sessionId?: string;
+  circuits?: CircuitInfo[];
+  ledgerState?: LedgerState;
+  callHistory?: CircuitCallRecord[];
+  expiresAt?: string;
 }
