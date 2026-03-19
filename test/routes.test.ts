@@ -408,7 +408,7 @@ describe("POST /analyze", () => {
     expect(body.recommendations).toBeDefined();
   });
 
-  it("mode=deep → 200, returns analysis with compilation", async () => {
+  it("mode=deep → 200, returns analysis with compilations", async () => {
     const analysisResult = {
       success: true,
       mode: "deep",
@@ -428,8 +428,9 @@ describe("POST /analyze", () => {
       findings: [],
       recommendations: [],
       circuits: [],
-      compilation: { success: true, diagnostics: [], executionTime: 50 },
-      compiler: { available: true, executionTime: 50 },
+      compilations: [
+        { success: true, diagnostics: [], executionTime: 50, requestedVersion: "default" },
+      ],
     };
     mockAnalyzeContract.mockResolvedValue(analysisResult);
 
@@ -443,7 +444,8 @@ describe("POST /analyze", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.mode).toBe("deep");
-    expect(body.compilation).toBeDefined();
+    expect(body.compilations).toBeDefined();
+    expect((body.compilations as unknown[]).length).toBe(1);
   });
 
   it("invalid mode → 400 with validation error", async () => {

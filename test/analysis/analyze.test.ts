@@ -28,7 +28,7 @@ export circuit getBalance(): Uint<64> {
       // Top-level shape
       expect(result.success).toBe(true);
       expect(result.mode).toBe("fast");
-      expect(result.compilation).toBeUndefined();
+      expect(result.compilations).toBeUndefined();
 
       // Summary
       expect(result.summary.hasLedger).toBe(true);

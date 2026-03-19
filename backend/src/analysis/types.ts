@@ -219,6 +219,7 @@ export interface CompilationResult {
   diagnostics: CompilerDiagnostic[];
   executionTime?: number;
   compilerVersion?: string;
+  requestedVersion?: string;
   languageVersion?: string;
 }
 
@@ -247,13 +248,6 @@ export interface CircuitAnalysis {
 export interface AnalysisResponse {
   success: boolean;
   mode: "fast" | "deep";
-  compiler?: {
-    requestedVersion?: string;
-    resolvedVersion?: string;
-    languageVersion?: string;
-    executionTime?: number;
-    available: boolean;
-  };
   diagnostics: ParseDiagnostic[];
   summary: AnalysisSummary;
   structure: AnalysisStructure;
@@ -264,13 +258,7 @@ export interface AnalysisResponse {
   findings: Finding[];
   recommendations: Recommendation[];
   circuits: CircuitAnalysis[];
-  compilation?: CompilationResult;
-  compilations?: Array<
-    CompilationResult & {
-      version: string;
-      requestedVersion: string;
-    }
-  >;
+  compilations?: CompilationResult[];
   cacheKey?: string;
 }
 
