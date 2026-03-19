@@ -14,6 +14,7 @@ describe("compile", () => {
     resetConfig();
     tempCacheDir = await mkdtemp(join(tmpdir(), "compile-cache-test-"));
     process.env.CACHE_DIR = tempCacheDir;
+    process.env.CACHE_ENABLED = "true";
     // Initialize the file cache for this test
     const cache = getFileCache();
     if (cache) await cache.init();
@@ -23,6 +24,7 @@ describe("compile", () => {
     resetFileCache();
     resetConfig();
     delete process.env.CACHE_DIR;
+    delete process.env.CACHE_ENABLED;
     await rm(tempCacheDir, { recursive: true, force: true });
   });
 
