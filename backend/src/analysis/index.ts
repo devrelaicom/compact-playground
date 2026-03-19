@@ -136,7 +136,7 @@ function buildCircuitAnalyses(
 export async function analyzeContract(
   code: string,
   options: AnalyzeOptions,
-): Promise<AnalysisResponse> {
+): Promise<{ result: AnalysisResponse; cacheKey?: string }> {
   // Only cache fast-mode analysis (deep mode depends on compile results and versions)
   const cache = options.mode === "fast" ? getFileCache() : null;
   const cacheKey = cache ? generateCacheKey(code, "none", { mode: options.mode }) : null;
@@ -145,7 +145,7 @@ export async function analyzeContract(
     const cached = await cache.get<AnalysisResponse>("analyze", cacheKey);
     if (cached) {
       // Apply post-processing filters on cached result
-      return applyFilters(cached, options);
+      return { result: applyFilters(cached, options), cacheKey };
     }
   }
 
@@ -178,7 +178,6 @@ export async function analyzeContract(
     findings,
     recommendations,
     circuits: circuitAnalyses,
-    cacheKey: cacheKey ?? undefined,
   };
 
   // Deep mode: add compilations
@@ -241,7 +240,7 @@ export async function analyzeContract(
   }
 
   // Apply post-processing filters
-  return applyFilters(response, options);
+  return { result: applyFilters(response, options), cacheKey: cacheKey ?? undefined };
 }
 
 function applyFilters(response: AnalysisResponse, options: AnalyzeOptions): AnalysisResponse {

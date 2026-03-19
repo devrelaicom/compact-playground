@@ -262,7 +262,6 @@ export interface AnalysisResponse {
   recommendations: Recommendation[];
   circuits: CircuitAnalysis[];
   compilations?: CompilationResult[];
-  cacheKey?: string;
 }
 
 // ── Request Options ──────────────────────────────────────────────────

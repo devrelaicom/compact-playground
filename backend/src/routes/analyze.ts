@@ -21,8 +21,8 @@ analyzeRoutes.post("/analyze", async (c) => {
   const { code, mode, versions, include, circuit } = parsed.data;
 
   try {
-    const result = await analyzeContract(code, { mode, versions, include, circuit });
-    return c.json(result);
+    const { result, cacheKey } = await analyzeContract(code, { mode, versions, include, circuit });
+    return c.json({ ...result, cacheKey });
   } catch (error) {
     console.error("Analysis error:", error);
     return c.json(

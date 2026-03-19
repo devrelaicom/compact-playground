@@ -390,7 +390,7 @@ describe("POST /analyze", () => {
       recommendations: [],
       circuits: [],
     };
-    mockAnalyzeContract.mockResolvedValue(analysisResult);
+    mockAnalyzeContract.mockResolvedValue({ result: analysisResult });
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -432,7 +432,7 @@ describe("POST /analyze", () => {
         { success: true, diagnostics: [], executionTime: 50, requestedVersion: "default" },
       ],
     };
-    mockAnalyzeContract.mockResolvedValue(analysisResult);
+    mockAnalyzeContract.mockResolvedValue({ result: analysisResult });
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -486,7 +486,9 @@ describe("POST /analyze", () => {
   });
 
   it("accepts circuit filter parameter", async () => {
-    mockAnalyzeContract.mockResolvedValue({ success: true, mode: "fast", circuits: [] });
+    mockAnalyzeContract.mockResolvedValue({
+      result: { success: true, mode: "fast", circuits: [] },
+    });
 
     const res = await app.request("/analyze", {
       method: "POST",

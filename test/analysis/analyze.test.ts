@@ -23,7 +23,7 @@ export circuit getBalance(): Uint<64> {
   return balance;
 }`;
 
-      const result = await analyzeContract(code, { mode: "fast" });
+      const { result } = await analyzeContract(code, { mode: "fast" });
 
       // Top-level shape
       expect(result.success).toBe(true);
@@ -59,7 +59,7 @@ export circuit getBalance(): Uint<64> {
     });
 
     it("returns diagnostics for empty code", async () => {
-      const result = await analyzeContract("", { mode: "fast" });
+      const { result } = await analyzeContract("", { mode: "fast" });
       expect(result.success).toBe(true);
       expect(result.summary.hasCircuits).toBe(false);
     });
@@ -70,7 +70,7 @@ import CompactStandardLibrary;
 export circuit a(): [] {}
 export circuit b(): [] {}`;
 
-      const result = await analyzeContract(code, { mode: "fast", circuit: "a" });
+      const { result } = await analyzeContract(code, { mode: "fast", circuit: "a" });
       expect(result.circuits).toHaveLength(1);
       expect(result.circuits[0]?.name).toBe("a");
     });
@@ -82,11 +82,11 @@ export ledger counter: Counter;
 witness unused: () => Field;
 export circuit inc(): [] { counter.increment(1); }`;
 
-      const full = await analyzeContract(code, { mode: "fast" });
+      const { result: full } = await analyzeContract(code, { mode: "fast" });
       expect(full.findings.length).toBeGreaterThan(0);
       expect(full.circuits.length).toBeGreaterThan(0);
 
-      const filtered = await analyzeContract(code, {
+      const { result: filtered } = await analyzeContract(code, {
         mode: "fast",
         include: ["diagnostics"],
       });
@@ -109,7 +109,7 @@ export circuit inc(): [] {
   counter.increment(1);
 }`;
 
-      const result = await analyzeContract(code, { mode: "fast" });
+      const { result } = await analyzeContract(code, { mode: "fast" });
       expect(result.circuits).toHaveLength(1);
       const circuit = result.circuits[0];
       expect(circuit).toBeDefined();
