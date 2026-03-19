@@ -72,7 +72,7 @@ export async function formatCode(
         return {
           result: {
             success: false,
-            compilerVersion: version,
+            compilerVersion: version || undefined,
             errors: [
               {
                 message: `Version ${version} is not available: ${err instanceof Error ? err.message : String(err)}`,
@@ -95,7 +95,7 @@ export async function formatCode(
       return {
         result: {
           success: false,
-          compilerVersion: version,
+          compilerVersion: version || undefined,
           errors: [{ message: result.stderr || "Formatting failed", severity: "error" }],
         },
       };
@@ -106,7 +106,7 @@ export async function formatCode(
 
     const formatResult: FormatResult = {
       success: true,
-      compilerVersion: version,
+      compilerVersion: version || undefined,
       formatted,
       changed,
     };
