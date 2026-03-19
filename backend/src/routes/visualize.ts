@@ -5,6 +5,7 @@ import { parseSource } from "../analysis/parser.js";
 import { buildSemanticModel } from "../analysis/semantic-model.js";
 import { generateContractGraph } from "../visualizer.js";
 import type { VisualizationResult } from "../visualizer.js";
+import { getFileCache, generateCacheKey } from "../cache.js";
 
 const visualizeRoutes = new Hono();
 
@@ -24,12 +25,27 @@ visualizeRoutes.post("/visualize", async (c) => {
   const { code } = parsed.data;
 
   try {
+    const cache = getFileCache();
+    const cacheKey = cache ? generateCacheKey(code, "none", { endpoint: "visualize" }) : null;
+
+    if (cache && cacheKey) {
+      const cached = await cache.get<VisualizationResult>("visualize", cacheKey);
+      if (cached) {
+        return c.json({ ...cached, cacheKey });
+      }
+    }
+
     const source = parseSource(code);
     const model = buildSemanticModel(source);
     const graph = generateContractGraph(source, model);
 
     const result: VisualizationResult = { success: true, graph };
-    return c.json(result);
+
+    if (cache && cacheKey) {
+      await cache.set("visualize", cacheKey, result);
+    }
+
+    return c.json({ ...result, cacheKey: cacheKey ?? undefined });
   } catch (error) {
     console.error("Visualization error:", error);
     const result: VisualizationResult = {

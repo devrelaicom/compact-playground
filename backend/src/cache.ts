@@ -60,7 +60,7 @@ export class FileCache {
 
   /** Rebuild index from disk, delete expired entries */
   async init(): Promise<void> {
-    const endpoints = ["compile", "format", "analyze", "diff", "compile-archive"];
+    const endpoints = ["compile", "format", "analyze", "diff", "compile-archive", "visualize"];
 
     for (const endpoint of endpoints) {
       const endpointDir = join(this.baseDir, endpoint);
