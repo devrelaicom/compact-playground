@@ -13,9 +13,9 @@ import type {
   AnalysisStructure,
   CircuitAnalysis,
   AnalyzeOptions,
-  CompilerDiagnostic,
   Finding,
 } from "./types.js";
+import type { CompilerError } from "../parser.js";
 
 export type { AnalysisResponse, AnalyzeOptions };
 
@@ -190,7 +190,7 @@ export async function analyzeContract(
         column?: number;
         file?: string;
       }>,
-    ): CompilerDiagnostic[] =>
+    ): CompilerError[] =>
       errors.map((e) => ({
         severity: e.severity,
         message: e.message,

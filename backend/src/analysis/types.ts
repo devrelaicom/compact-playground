@@ -1,5 +1,7 @@
 // backend/src/analysis/types.ts
 
+import type { ExecutableError } from "../types.js";
+
 // ── Source Location ──────────────────────────────────────────────────
 
 export interface SourceLocation {
@@ -15,9 +17,7 @@ export interface SourceSpan {
 
 // ── Parse Diagnostics ────────────────────────────────────────────────
 
-export interface ParseDiagnostic {
-  severity: "error" | "warning" | "info";
-  message: string;
+export interface ParseDiagnostic extends ExecutableError {
   location?: SourceLocation;
 }
 
@@ -164,6 +164,7 @@ export interface CircuitExplanation {
 }
 
 import type { AnalysisError } from "../types.js";
+import type { CompilerError } from "../parser.js";
 
 // ── Analysis Response (canonical schema) ─────────────────────────────
 
@@ -208,17 +209,9 @@ export interface AnalysisStructure {
   }>;
 }
 
-export interface CompilerDiagnostic {
-  severity: "error" | "warning" | "info";
-  message: string;
-  line?: number;
-  column?: number;
-  file?: string;
-}
-
 export interface CompilationResult {
   success: boolean;
-  diagnostics: CompilerDiagnostic[];
+  diagnostics: CompilerError[];
   executionTime?: number;
   compilerVersion?: string;
   requestedVersion?: string;
