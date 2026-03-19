@@ -105,8 +105,11 @@ archiveCompileRoutes.post(
     }
 
     try {
-      const result = await compileArchive(archiveBuffer, entryPoint, options);
-      return c.json(result);
+      const { result, cacheKey } = await compileArchive(archiveBuffer, entryPoint, options);
+      return c.json({
+        results: [{ ...result, requestedVersion: "detect" }],
+        cacheKey,
+      });
     } catch (error) {
       if (error instanceof ArchiveValidationError) {
         return c.json({ success: false, error: "Validation error", message: error.message }, 400);

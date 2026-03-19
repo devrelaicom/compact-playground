@@ -184,7 +184,7 @@ export async function analyzeContract(
   if (options.mode === "deep") {
     if (options.versions && options.versions.length > 0) {
       const compilations = await runMultiVersion(options.versions, code, async (version) => {
-        const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
+        const { result } = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
         return {
           success: result.success,
           diagnostics: (result.errors ?? []).map((e) => ({
@@ -208,17 +208,20 @@ export async function analyzeContract(
 
       response.compiler = { available: true };
     } else {
-      const result = await compile(code, { wrapWithDefaults: true, skipZk: true });
+      const { result: compileResult } = await compile(code, {
+        wrapWithDefaults: true,
+        skipZk: true,
+      });
       response.compilation = {
-        success: result.success,
-        diagnostics: (result.errors ?? []).map((e) => ({
+        success: compileResult.success,
+        diagnostics: (compileResult.errors ?? []).map((e) => ({
           severity: e.severity,
           message: e.message,
           line: e.line,
           column: e.column,
           file: e.file,
         })),
-        executionTime: result.executionTime,
+        executionTime: compileResult.executionTime,
       };
 
       response.compiler = {

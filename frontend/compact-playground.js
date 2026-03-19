@@ -242,7 +242,8 @@
         throw new Error(`Server error: ${response.status} - ${text}`);
       }
 
-      return response.json();
+      const body = await response.json();
+      return body.results[0];
     }
 
     /**
