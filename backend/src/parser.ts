@@ -2,11 +2,11 @@
  * Parser for Compact compiler error output
  */
 
-export interface CompilerError {
+import type { ExecutableError } from "./types.js";
+
+export interface CompilerError extends ExecutableError {
   line?: number;
   column?: number;
-  message: string;
-  severity: "error" | "warning" | "info";
   file?: string;
 }
 

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "./config.js";
 import { getDefaultVersion, prepareVersionDir } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
+import type { FormatterError } from "./types.js";
 
 export interface FormatOptions {
   timeout?: number;
@@ -13,16 +14,25 @@ export interface FormatOptions {
 
 export interface FormatResult {
   success: boolean;
+  compilerVersion?: string;
+  requestedVersion?: string;
   formatted?: string;
   changed?: boolean;
   diff?: string;
-  error?: string;
-  cacheKey?: string;
+  errors?: FormatterError[];
 }
 
-export async function formatCode(code: string, options: FormatOptions = {}): Promise<FormatResult> {
+export async function formatCode(
+  code: string,
+  options: FormatOptions = {},
+): Promise<{ result: FormatResult; cacheKey?: string }> {
   if (!code || !code.trim()) {
-    return { success: false, error: "No code to format" };
+    return {
+      result: {
+        success: false,
+        errors: [{ message: "No code to format", severity: "error" }],
+      },
+    };
   }
 
   // Check file cache
@@ -33,7 +43,7 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
   if (cache && cacheKey) {
     const cached = await cache.get<FormatResult>("format", cacheKey);
     if (cached) {
-      return cached;
+      return { result: cached, cacheKey };
     }
   }
 
@@ -60,8 +70,16 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
         versionDir = await prepareVersionDir(version);
       } catch (err) {
         return {
-          success: false,
-          error: `Version ${version} is not available: ${err instanceof Error ? err.message : String(err)}`,
+          result: {
+            success: false,
+            compilerVersion: version || undefined,
+            errors: [
+              {
+                message: `Version ${version} is not available: ${err instanceof Error ? err.message : String(err)}`,
+                severity: "error",
+              },
+            ],
+          },
         };
       }
     }
@@ -75,8 +93,11 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
 
     if (result.exitCode !== 0) {
       return {
-        success: false,
-        error: result.stderr || "Formatting failed",
+        result: {
+          success: false,
+          compilerVersion: version || undefined,
+          errors: [{ message: result.stderr || "Formatting failed", severity: "error" }],
+        },
       };
     }
 
@@ -85,9 +106,9 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
 
     const formatResult: FormatResult = {
       success: true,
+      compilerVersion: version || undefined,
       formatted,
       changed,
-      cacheKey: cacheKey ?? undefined,
     };
 
     if (changed) {
@@ -98,7 +119,7 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
       await cache.set("format", cacheKey, formatResult);
     }
 
-    return formatResult;
+    return { result: formatResult, cacheKey: cacheKey ?? undefined };
   } finally {
     try {
       await rm(sessionDir, { recursive: true, force: true });

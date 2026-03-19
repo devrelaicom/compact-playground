@@ -1,4 +1,5 @@
 import type { ParsedSource, SemanticModel } from "./analysis/types.js";
+import type { VisualizationError } from "./types.js";
 
 export interface GraphNode {
   id: string;
@@ -24,6 +25,12 @@ export interface ContractGraph {
   edges: GraphEdge[];
   groups: GraphGroup[];
   mermaid: string;
+}
+
+export interface VisualizationResult {
+  success: boolean;
+  errors?: VisualizationError[];
+  graph?: ContractGraph;
 }
 
 export function generateContractGraph(source: ParsedSource, model: SemanticModel): ContractGraph {

@@ -183,7 +183,7 @@ describe("POST /compile/archive", () => {
         executionTime: 150,
         originalCode: "export circuit main(): [] {}",
       };
-      mockCompileArchive.mockResolvedValue(compileResult);
+      mockCompileArchive.mockResolvedValue({ result: compileResult, cacheKey: "mock-key" });
 
       const archive = await createTarGz({ "main.compact": "export circuit main(): [] {}" });
       const form = buildFormData(archive, "main.compact");
@@ -195,11 +195,15 @@ describe("POST /compile/archive", () => {
 
       expect(res.status).toBe(200);
       const body = (await res.json()) as Record<string, unknown>;
-      expect(body.success).toBe(true);
-      expect(body.output).toBe("Compilation successful");
-      expect(body.compiledAt).toBeDefined();
-      expect(body.executionTime).toBeDefined();
-      expect(body.originalCode).toBeDefined();
+      const results = body.results as Record<string, unknown>[];
+      expect(results).toHaveLength(1);
+      expect(results[0].success).toBe(true);
+      expect(results[0].output).toBe("Compilation successful");
+      expect(results[0].compiledAt).toBeDefined();
+      expect(results[0].executionTime).toBeDefined();
+      expect(results[0].originalCode).toBeDefined();
+      expect(results[0].requestedVersion).toBe("detect");
+      expect(body.cacheKey).toBe("mock-key");
 
       expect(mockCompileArchive).toHaveBeenCalledOnce();
       const [buf, entry, opts] = mockCompileArchive.mock.calls[0] as [Buffer, string, unknown];
@@ -209,7 +213,9 @@ describe("POST /compile/archive", () => {
     });
 
     it("passes options through when provided", async () => {
-      mockCompileArchive.mockResolvedValue({ success: true, output: "ok" });
+      mockCompileArchive.mockResolvedValue({
+        result: { success: true, output: "ok", compiledAt: "2024-01-01T00:00:00Z" },
+      });
 
       const archive = await createTarGz({ "main.compact": "code" });
       const form = buildFormData(archive, "main.compact", { skipZk: true, timeout: 5000 });

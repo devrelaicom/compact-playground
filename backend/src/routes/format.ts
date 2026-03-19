@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { formatCode } from "../formatter.js";
+import { formatCode, type FormatResult } from "../formatter.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { formatBodySchema } from "../request-schemas.js";
@@ -24,18 +24,34 @@ formatRoutes.post("/format", async (c) => {
   try {
     // Multi-version: format with each version
     if (versions && versions.length > 0) {
-      const results = await runMultiVersion(
-        versions,
-        code,
-        (version) =>
-          formatCode(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>,
-      );
-      return c.json({ success: true, results });
+      const mvResults = await runMultiVersion(versions, code, async (version) => {
+        const { result } = await formatCode(code, { ...options, version });
+        return result as unknown as Record<string, unknown>;
+      });
+
+      const results: FormatResult[] = mvResults.map((r) => {
+        const { requestedVersion, error, ...rest } = r;
+        delete (rest as Record<string, unknown>).version;
+        const mapped = { ...rest, requestedVersion } as unknown as FormatResult;
+
+        // Convert runMultiVersion's rejected-promise error into errors[]
+        if (error && !mapped.errors) {
+          mapped.success = false;
+          mapped.errors = [{ message: error, severity: "error" as const }];
+        }
+
+        return mapped;
+      });
+
+      return c.json({ results });
     }
 
-    // Single version (backward compatible): flat response
-    const result = await formatCode(code, options);
-    return c.json(result);
+    // Single version
+    const { result, cacheKey } = await formatCode(code, options);
+    return c.json({
+      results: [{ ...result, requestedVersion: options.version ?? "default" }],
+      cacheKey,
+    });
   } catch (error) {
     console.error("Format error:", error);
     return c.json(

@@ -15,7 +15,7 @@ export circuit subtract(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a - b) as Uint<64>;
 }`;
 
-    const diff = await diffContracts(before, after);
+    const { result: diff } = await diffContracts(before, after);
 
     expect(diff.circuits.added).toHaveLength(1);
     expect(diff.circuits.added[0].name).toBe("subtract");
@@ -35,7 +35,7 @@ export circuit subtract(a: Uint<64>, b: Uint<64>): Uint<64> {
   return (a + b) as Uint<64>;
 }`;
 
-    const diff = await diffContracts(before, after);
+    const { result: diff } = await diffContracts(before, after);
 
     expect(diff.circuits.removed).toHaveLength(1);
     expect(diff.circuits.removed[0].name).toBe("subtract");
@@ -50,7 +50,7 @@ export circuit subtract(a: Uint<64>, b: Uint<64>): Uint<64> {
   return;
 }`;
 
-    const diff = await diffContracts(before, after);
+    const { result: diff } = await diffContracts(before, after);
 
     expect(diff.circuits.modified).toHaveLength(1);
     expect(diff.circuits.modified[0].name).toBe("transfer");
@@ -62,7 +62,7 @@ export circuit subtract(a: Uint<64>, b: Uint<64>): Uint<64> {
     const after = `export ledger counter: Counter;
 export ledger balance: Uint<64>;`;
 
-    const diff = await diffContracts(before, after);
+    const { result: diff } = await diffContracts(before, after);
 
     expect(diff.ledger.added).toHaveLength(1);
     expect(diff.ledger.added[0].name).toBe("balance");
@@ -72,7 +72,7 @@ export ledger balance: Uint<64>;`;
     const before = `export ledger balance: Uint<32>;`;
     const after = `export ledger balance: Uint<64>;`;
 
-    const diff = await diffContracts(before, after);
+    const { result: diff } = await diffContracts(before, after);
 
     expect(diff.ledger.modified).toHaveLength(1);
     expect(diff.ledger.modified[0].name).toBe("balance");
@@ -83,7 +83,7 @@ export ledger balance: Uint<64>;`;
   it("reports no changes for identical contracts", async () => {
     const code = `export circuit add(a: Uint<64>): Uint<64> { return a; }`;
 
-    const diff = await diffContracts(code, code);
+    const { result: diff } = await diffContracts(code, code);
 
     expect(diff.circuits.added).toHaveLength(0);
     expect(diff.circuits.removed).toHaveLength(0);

@@ -137,7 +137,7 @@ describe("POST /compile", () => {
       compiledAt: "2024-01-01T00:00:00Z",
       executionTime: 100,
     };
-    mockCompile.mockResolvedValue(compileResult);
+    mockCompile.mockResolvedValue({ result: compileResult, cacheKey: "mock-key" });
 
     const res = await app.request("/compile", {
       method: "POST",
@@ -147,8 +147,12 @@ describe("POST /compile", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.success).toBe(true);
-    expect(body.output).toBe("compiled output");
+    const results = body.results as Record<string, unknown>[];
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].output).toBe("compiled output");
+    expect(results[0].requestedVersion).toBe("default");
+    expect(body.cacheKey).toBe("mock-key");
     expect(mockCompile).toHaveBeenCalledWith("export circuit test(): [] {}", {});
   });
 
@@ -187,7 +191,7 @@ describe("POST /compile", () => {
       compiledAt: "2024-01-01T00:00:00Z",
       bindings: { "contract.ts": "export class Contract {}" },
     };
-    mockCompile.mockResolvedValue(compileResult);
+    mockCompile.mockResolvedValue({ result: compileResult });
 
     const res = await app.request("/compile", {
       method: "POST",
@@ -200,7 +204,8 @@ describe("POST /compile", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.bindings).toEqual({ "contract.ts": "export class Contract {}" });
+    const results = body.results as Record<string, unknown>[];
+    expect(results[0].bindings).toEqual({ "contract.ts": "export class Contract {}" });
     expect(mockCompile).toHaveBeenCalledWith(
       "export circuit test(): [] {}",
       expect.objectContaining({ includeBindings: true }),
@@ -221,7 +226,7 @@ describe("POST /compile", () => {
         usesZkProofs: true,
       },
     };
-    mockCompile.mockResolvedValue(compileResult);
+    mockCompile.mockResolvedValue({ result: compileResult });
 
     const res = await app.request("/compile", {
       method: "POST",
@@ -231,16 +236,29 @@ describe("POST /compile", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.insights).toBeDefined();
-    const insights = body.insights as Record<string, unknown>;
+    const results = body.results as Record<string, unknown>[];
+    expect(results[0].insights).toBeDefined();
+    const insights = results[0].insights as Record<string, unknown>;
     expect(insights.circuitCount).toBe(2);
     expect(insights.usesZkProofs).toBe(true);
   });
 
   it("with versions array → 200, calls runMultiVersion", async () => {
     const multiVersionResults = [
-      { version: "0.29.0", requestedVersion: "0.29.0", success: true },
-      { version: "0.28.0", requestedVersion: "0.28.0", success: true },
+      {
+        version: "0.29.0",
+        requestedVersion: "0.29.0",
+        success: true,
+        compilerVersion: "0.29.0",
+        compiledAt: "2024-01-01T00:00:00Z",
+      },
+      {
+        version: "0.28.0",
+        requestedVersion: "0.28.0",
+        success: true,
+        compilerVersion: "0.28.0",
+        compiledAt: "2024-01-01T00:00:00Z",
+      },
     ];
     mockRunMultiVersion.mockResolvedValue(multiVersionResults);
 
@@ -255,8 +273,14 @@ describe("POST /compile", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.success).toBe(true);
-    expect(body.results).toEqual(multiVersionResults);
+    const results = body.results as Record<string, unknown>[];
+    expect(results).toHaveLength(2);
+    expect(results[0].requestedVersion).toBe("0.29.0");
+    expect(results[0].compilerVersion).toBe("0.29.0");
+    expect(results[0].success).toBe(true);
+    // version field from runMultiVersion should be stripped
+    expect(results[0]).not.toHaveProperty("version");
+    expect(body).not.toHaveProperty("success");
     expect(mockRunMultiVersion).toHaveBeenCalled();
   });
 });
@@ -273,7 +297,7 @@ describe("POST /format", () => {
 
   it("valid code → 200, returns format result", async () => {
     const formatResult = { success: true, formatted: "formatted code" };
-    mockFormatCode.mockResolvedValue(formatResult);
+    mockFormatCode.mockResolvedValue({ result: formatResult, cacheKey: "mock-key" });
 
     const res = await app.request("/format", {
       method: "POST",
@@ -283,8 +307,12 @@ describe("POST /format", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.success).toBe(true);
-    expect(body.formatted).toBe("formatted code");
+    const results = body.results as Record<string, unknown>[];
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].formatted).toBe("formatted code");
+    expect(results[0].requestedVersion).toBe("default");
+    expect(body.cacheKey).toBe("mock-key");
   });
 
   it("missing code → 400", async () => {
@@ -362,7 +390,7 @@ describe("POST /analyze", () => {
       recommendations: [],
       circuits: [],
     };
-    mockAnalyzeContract.mockResolvedValue(analysisResult);
+    mockAnalyzeContract.mockResolvedValue({ result: analysisResult });
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -380,7 +408,7 @@ describe("POST /analyze", () => {
     expect(body.recommendations).toBeDefined();
   });
 
-  it("mode=deep → 200, returns analysis with compilation", async () => {
+  it("mode=deep → 200, returns analysis with compilations", async () => {
     const analysisResult = {
       success: true,
       mode: "deep",
@@ -400,10 +428,11 @@ describe("POST /analyze", () => {
       findings: [],
       recommendations: [],
       circuits: [],
-      compilation: { success: true, diagnostics: [], executionTime: 50 },
-      compiler: { available: true, executionTime: 50 },
+      compilations: [
+        { success: true, diagnostics: [], executionTime: 50, requestedVersion: "default" },
+      ],
     };
-    mockAnalyzeContract.mockResolvedValue(analysisResult);
+    mockAnalyzeContract.mockResolvedValue({ result: analysisResult });
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -415,7 +444,8 @@ describe("POST /analyze", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.mode).toBe("deep");
-    expect(body.compilation).toBeDefined();
+    expect(body.compilations).toBeDefined();
+    expect((body.compilations as unknown[]).length).toBe(1);
   });
 
   it("invalid mode → 400 with validation error", async () => {
@@ -456,7 +486,9 @@ describe("POST /analyze", () => {
   });
 
   it("accepts circuit filter parameter", async () => {
-    mockAnalyzeContract.mockResolvedValue({ success: true, mode: "fast", circuits: [] });
+    mockAnalyzeContract.mockResolvedValue({
+      result: { success: true, mode: "fast", circuits: [] },
+    });
 
     const res = await app.request("/analyze", {
       method: "POST",
@@ -483,8 +515,15 @@ describe("POST /diff", () => {
   });
 
   it("valid before+after → 200", async () => {
-    const diffResult = { changes: [], linesAdded: 0, linesRemoved: 0 };
-    mockDiffContracts.mockResolvedValue(diffResult);
+    const diffResult = {
+      success: true,
+      hasChanges: false,
+      circuits: {},
+      ledger: {},
+      pragma: {},
+      imports: {},
+    };
+    mockDiffContracts.mockResolvedValue({ result: diffResult, cacheKey: "mock-key" });
 
     const res = await app.request("/diff", {
       method: "POST",
@@ -495,6 +534,7 @@ describe("POST /diff", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
+    expect(body.cacheKey).toBe("mock-key");
   });
 
   it("missing before → 400 with validation error", async () => {

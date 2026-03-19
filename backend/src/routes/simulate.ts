@@ -3,6 +3,7 @@ import { z } from "zod";
 import { deployContract, callCircuit } from "../simulator/engine.js";
 import { getSession, deleteSession } from "../simulator/session-manager.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
+import type { SimulationResult } from "../simulator/types.js";
 
 const simulateRoutes = new Hono();
 
@@ -31,7 +32,7 @@ simulateRoutes.post("/simulate/deploy", async (c) => {
   }
 
   const result = await deployContract(parsed.data);
-  if (!result.success && result.errorCode === "CAPACITY_EXCEEDED") {
+  if (!result.success && result.errors?.[0]?.errorCode === "CAPACITY_EXCEEDED") {
     return c.json(result, 503);
   }
   return c.json(result, result.success ? 200 : 400);
@@ -52,33 +53,52 @@ simulateRoutes.post("/simulate/:sessionId/call", async (c) => {
   }
 
   const result = await callCircuit(sessionId, parsed.data);
-  if (!result.success && result.errorCode === "SESSION_NOT_FOUND") {
+  if (!result.success && result.errors?.[0]?.errorCode === "SESSION_NOT_FOUND") {
     return c.json(result, 404);
   }
   return c.json(result, result.success ? 200 : 400);
 });
 
 simulateRoutes.get("/simulate/:sessionId/state", (c) => {
-  const session = getSession(c.req.param("sessionId"));
+  const sessionId = c.req.param("sessionId");
+  const session = getSession(sessionId);
   if (!session) {
-    return c.json({ success: false, error: "Session not found or expired" }, 404);
+    const result: SimulationResult = {
+      success: false,
+      sessionId,
+      errors: [
+        {
+          message: "Session not found or expired",
+          severity: "error",
+          errorCode: "SESSION_NOT_FOUND",
+        },
+      ],
+    };
+    return c.json(result, 404);
   }
-  return c.json({
+  const result: SimulationResult = {
     success: true,
     sessionId: session.id,
     ledgerState: session.ledgerState,
     circuits: session.circuits,
     callHistory: session.callHistory,
     expiresAt: new Date(session.expiresAt).toISOString(),
-  });
+  };
+  return c.json(result);
 });
 
 simulateRoutes.delete("/simulate/:sessionId", (c) => {
-  const deleted = deleteSession(c.req.param("sessionId"));
+  const sessionId = c.req.param("sessionId");
+  const deleted = deleteSession(sessionId);
   if (!deleted) {
-    return c.json({ success: false, error: "Session not found" }, 404);
+    const result: SimulationResult = {
+      success: false,
+      sessionId,
+      errors: [{ message: "Session not found", severity: "error", errorCode: "SESSION_NOT_FOUND" }],
+    };
+    return c.json(result, 404);
   }
-  return c.json({ success: true, message: "Session deleted" });
+  return c.json({ success: true, sessionId });
 });
 
 export { simulateRoutes };

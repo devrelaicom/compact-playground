@@ -21,14 +21,19 @@ diffRoutes.post("/diff", async (c) => {
   const { before, after } = parsed.data;
 
   try {
-    const result = await diffContracts(before, after);
-    return c.json({ success: true, ...result });
+    const { result, cacheKey } = await diffContracts(before, after);
+    return c.json({ ...result, cacheKey });
   } catch (error) {
     console.error("Diff error:", error);
     return c.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred",
+        errors: [
+          {
+            message: error instanceof Error ? error.message : "An unknown error occurred",
+            severity: "error" as const,
+          },
+        ],
       },
       500,
     );

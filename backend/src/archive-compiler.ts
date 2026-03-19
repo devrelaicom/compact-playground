@@ -19,7 +19,7 @@ export async function compileArchive(
   archiveBuffer: Buffer,
   entryPoint: string,
   options?: { skipZk?: boolean; timeout?: number },
-): Promise<CompileResult> {
+): Promise<{ result: CompileResult; cacheKey?: string }> {
   const config = getConfig();
   const startTime = Date.now();
   const sessionId = uuidv4();
@@ -70,7 +70,7 @@ export async function compileArchive(
     if (cache && cacheKey) {
       const cached = await cache.get<CompileResult>("compile-archive", cacheKey);
       if (cached) {
-        return cached;
+        return { result: cached, cacheKey };
       }
     }
 
@@ -96,6 +96,7 @@ export async function compileArchive(
       const warnings = parseCompilerErrors(result.stderr);
       const compileResult: CompileResult = {
         success: true,
+        compilerVersion: detectedVersion,
         output: "Compilation successful",
         warnings: warnings.length > 0 ? warnings : undefined,
         compiledAt: new Date().toISOString(),
@@ -107,25 +108,28 @@ export async function compileArchive(
         await cache.set("compile-archive", cacheKey, compileResult);
       }
 
-      return compileResult;
+      return { result: compileResult, cacheKey: cacheKey ?? undefined };
     } else {
       const errors = parseCompilerErrors(result.stderr || result.stdout);
 
       return {
-        success: false,
-        errors:
-          errors.length > 0
-            ? errors
-            : [
-                {
-                  message: result.stderr || "Compilation failed",
-                  severity: "error",
-                },
-              ],
-        output: `Compilation failed with ${String(errors.length)} error(s)`,
-        compiledAt: new Date().toISOString(),
-        originalCode: entryPointContent,
-        executionTime,
+        result: {
+          success: false,
+          compilerVersion: detectedVersion,
+          errors:
+            errors.length > 0
+              ? errors
+              : [
+                  {
+                    message: result.stderr || "Compilation failed",
+                    severity: "error",
+                  },
+                ],
+          output: `Compilation failed with ${String(errors.length)} error(s)`,
+          compiledAt: new Date().toISOString(),
+          originalCode: entryPointContent,
+          executionTime,
+        },
       };
     }
   } finally {

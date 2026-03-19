@@ -26,6 +26,8 @@ export interface CompileOptions {
 
 export interface CompileResult {
   success: boolean;
+  compilerVersion?: string;
+  requestedVersion?: string;
   output?: string;
   errors?: CompilerError[];
   warnings?: CompilerError[];
@@ -35,13 +37,15 @@ export interface CompileResult {
   executionTime?: number;
   bindings?: Record<string, string>;
   insights?: CompilerInsights;
-  cacheKey?: string;
 }
 
 /**
  * Compiles Compact code and returns the result
  */
-export async function compile(code: string, options: CompileOptions = {}): Promise<CompileResult> {
+export async function compile(
+  code: string,
+  options: CompileOptions = {},
+): Promise<{ result: CompileResult; cacheKey?: string }> {
   const config = getConfig();
   const startTime = Date.now();
   const sessionId = uuidv4();
@@ -68,7 +72,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
     if (cache && cacheKey) {
       const cached = await cache.get<CompileResult>("compile", cacheKey);
       if (cached) {
-        return cached;
+        return { result: cached, cacheKey };
       }
     }
 
@@ -141,6 +145,7 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
 
       const compileResult: CompileResult = {
         success: true,
+        compilerVersion: compilerVersion ?? undefined,
         output: "Compilation successful",
         warnings: warnings.length > 0 ? warnings : undefined,
         compiledAt: new Date().toISOString(),
@@ -149,14 +154,13 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
         executionTime,
         bindings,
         insights,
-        cacheKey: cacheKey ?? undefined,
       };
 
       if (cache && cacheKey) {
         await cache.set("compile", cacheKey, compileResult);
       }
 
-      return compileResult;
+      return { result: compileResult, cacheKey: cacheKey ?? undefined };
     } else {
       // Compilation failed
       const errors = parseCompilerErrors(result.stderr || result.stdout);
@@ -172,21 +176,24 @@ export async function compile(code: string, options: CompileOptions = {}): Promi
       }
 
       return {
-        success: false,
-        errors:
-          errors.length > 0
-            ? errors
-            : [
-                {
-                  message: result.stderr || "Compilation failed",
-                  severity: "error",
-                },
-              ],
-        output: `Compilation failed with ${String(errors.length)} error(s)`,
-        compiledAt: new Date().toISOString(),
-        originalCode: needsWrapping ? code : undefined,
-        wrappedCode: needsWrapping ? finalCode : undefined,
-        executionTime,
+        result: {
+          success: false,
+          compilerVersion: compilerVersion ?? undefined,
+          errors:
+            errors.length > 0
+              ? errors
+              : [
+                  {
+                    message: result.stderr || "Compilation failed",
+                    severity: "error",
+                  },
+                ],
+          output: `Compilation failed with ${String(errors.length)} error(s)`,
+          compiledAt: new Date().toISOString(),
+          originalCode: needsWrapping ? code : undefined,
+          wrappedCode: needsWrapping ? finalCode : undefined,
+          executionTime,
+        },
       };
     }
   } finally {

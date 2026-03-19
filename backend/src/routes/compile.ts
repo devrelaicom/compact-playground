@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { compile } from "../compiler.js";
+import { compile, type CompileResult } from "../compiler.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { compileBodySchema } from "../request-schemas.js";
@@ -31,18 +31,35 @@ compileRoutes.post("/compile", async (c) => {
   try {
     // Multi-version: compile against each version
     if (versions && versions.length > 0) {
-      const results = await runMultiVersion(
-        versions,
-        code,
-        (version) =>
-          compile(code, { ...options, version }) as unknown as Promise<Record<string, unknown>>,
-      );
-      return c.json({ success: true, results });
+      const mvResults = await runMultiVersion(versions, code, async (version) => {
+        const { result } = await compile(code, { ...options, version });
+        return result as unknown as Record<string, unknown>;
+      });
+
+      const results: CompileResult[] = mvResults.map((r) => {
+        const { requestedVersion, error, ...rest } = r;
+        delete (rest as Record<string, unknown>).version;
+        const mapped = { ...rest, requestedVersion } as unknown as CompileResult;
+
+        // Convert runMultiVersion's rejected-promise error into errors[]
+        if (error && !mapped.errors) {
+          mapped.success = false;
+          mapped.compiledAt = mapped.compiledAt || new Date().toISOString();
+          mapped.errors = [{ message: error, severity: "error" as const }];
+        }
+
+        return mapped;
+      });
+
+      return c.json({ results });
     }
 
-    // Single version (backward compatible): flat response
-    const result = await compile(code, options);
-    return c.json(result);
+    // Single version
+    const { result, cacheKey } = await compile(code, options);
+    return c.json({
+      results: [{ ...result, requestedVersion: options.version ?? "default" }],
+      cacheKey,
+    });
   } catch (error) {
     console.error("Compilation error:", error);
     return c.json(

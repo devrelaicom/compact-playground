@@ -1,5 +1,7 @@
 // backend/src/analysis/types.ts
 
+import type { ExecutableError } from "../types.js";
+
 // ── Source Location ──────────────────────────────────────────────────
 
 export interface SourceLocation {
@@ -15,9 +17,7 @@ export interface SourceSpan {
 
 // ── Parse Diagnostics ────────────────────────────────────────────────
 
-export interface ParseDiagnostic {
-  severity: "error" | "warning" | "info";
-  message: string;
+export interface ParseDiagnostic extends ExecutableError {
   location?: SourceLocation;
 }
 
@@ -163,6 +163,9 @@ export interface CircuitExplanation {
   privacyConsiderations: string[];
 }
 
+import type { AnalysisError } from "../types.js";
+import type { CompilerError } from "../parser.js";
+
 // ── Analysis Response (canonical schema) ─────────────────────────────
 
 export interface AnalysisSummary {
@@ -206,19 +209,12 @@ export interface AnalysisStructure {
   }>;
 }
 
-export interface CompilerDiagnostic {
-  severity: "error" | "warning" | "info";
-  message: string;
-  line?: number;
-  column?: number;
-  file?: string;
-}
-
 export interface CompilationResult {
   success: boolean;
-  diagnostics: CompilerDiagnostic[];
+  diagnostics: CompilerError[];
   executionTime?: number;
   compilerVersion?: string;
+  requestedVersion?: string;
   languageVersion?: string;
 }
 
@@ -246,14 +242,8 @@ export interface CircuitAnalysis {
 
 export interface AnalysisResponse {
   success: boolean;
+  errors?: AnalysisError[];
   mode: "fast" | "deep";
-  compiler?: {
-    requestedVersion?: string;
-    resolvedVersion?: string;
-    languageVersion?: string;
-    executionTime?: number;
-    available: boolean;
-  };
   diagnostics: ParseDiagnostic[];
   summary: AnalysisSummary;
   structure: AnalysisStructure;
@@ -264,14 +254,7 @@ export interface AnalysisResponse {
   findings: Finding[];
   recommendations: Recommendation[];
   circuits: CircuitAnalysis[];
-  compilation?: CompilationResult;
-  compilations?: Array<
-    CompilationResult & {
-      version: string;
-      requestedVersion: string;
-    }
-  >;
-  cacheKey?: string;
+  compilations?: CompilationResult[];
 }
 
 // ── Request Options ──────────────────────────────────────────────────

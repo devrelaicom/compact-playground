@@ -15,6 +15,7 @@ import type {
   AnalyzeOptions,
   Finding,
 } from "./types.js";
+import type { CompilerError } from "../parser.js";
 
 export type { AnalysisResponse, AnalyzeOptions };
 
@@ -135,7 +136,7 @@ function buildCircuitAnalyses(
 export async function analyzeContract(
   code: string,
   options: AnalyzeOptions,
-): Promise<AnalysisResponse> {
+): Promise<{ result: AnalysisResponse; cacheKey?: string }> {
   // Only cache fast-mode analysis (deep mode depends on compile results and versions)
   const cache = options.mode === "fast" ? getFileCache() : null;
   const cacheKey = cache ? generateCacheKey(code, "none", { mode: options.mode }) : null;
@@ -144,7 +145,7 @@ export async function analyzeContract(
     const cached = await cache.get<AnalysisResponse>("analyze", cacheKey);
     if (cached) {
       // Apply post-processing filters on cached result
-      return applyFilters(cached, options);
+      return { result: applyFilters(cached, options), cacheKey };
     }
   }
 
@@ -177,54 +178,59 @@ export async function analyzeContract(
     findings,
     recommendations,
     circuits: circuitAnalyses,
-    cacheKey: cacheKey ?? undefined,
   };
 
-  // Deep mode: add compilation
+  // Deep mode: add compilations
   if (options.mode === "deep") {
+    const mapDiagnostics = (
+      errors: Array<{
+        severity: "error" | "warning" | "info";
+        message: string;
+        line?: number;
+        column?: number;
+        file?: string;
+      }>,
+    ): CompilerError[] =>
+      errors.map((e) => ({
+        severity: e.severity,
+        message: e.message,
+        line: e.line,
+        column: e.column,
+        file: e.file,
+      }));
+
     if (options.versions && options.versions.length > 0) {
-      const compilations = await runMultiVersion(options.versions, code, async (version) => {
-        const result = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
+      const mvResults = await runMultiVersion(options.versions, code, async (version) => {
+        const { result } = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
         return {
           success: result.success,
-          diagnostics: (result.errors ?? []).map((e) => ({
-            severity: e.severity,
-            message: e.message,
-            line: e.line,
-            column: e.column,
-            file: e.file,
-          })),
+          compilerVersion: result.compilerVersion,
+          diagnostics: mapDiagnostics(result.errors ?? []),
           executionTime: result.executionTime,
         };
       });
 
-      response.compilations = compilations.map((c) => ({
+      response.compilations = mvResults.map((c) => ({
         success: c.success,
+        compilerVersion: c.compilerVersion,
+        requestedVersion: c.requestedVersion,
         diagnostics: c.diagnostics,
         executionTime: c.executionTime,
-        version: c.version,
-        requestedVersion: c.requestedVersion,
       }));
-
-      response.compiler = { available: true };
     } else {
-      const result = await compile(code, { wrapWithDefaults: true, skipZk: true });
-      response.compilation = {
-        success: result.success,
-        diagnostics: (result.errors ?? []).map((e) => ({
-          severity: e.severity,
-          message: e.message,
-          line: e.line,
-          column: e.column,
-          file: e.file,
-        })),
-        executionTime: result.executionTime,
-      };
-
-      response.compiler = {
-        available: true,
-        executionTime: response.compilation.executionTime,
-      };
+      const { result: compileResult } = await compile(code, {
+        wrapWithDefaults: true,
+        skipZk: true,
+      });
+      response.compilations = [
+        {
+          success: compileResult.success,
+          compilerVersion: compileResult.compilerVersion,
+          requestedVersion: "default",
+          diagnostics: mapDiagnostics(compileResult.errors ?? []),
+          executionTime: compileResult.executionTime,
+        },
+      ];
     }
   }
 
@@ -234,7 +240,7 @@ export async function analyzeContract(
   }
 
   // Apply post-processing filters
-  return applyFilters(response, options);
+  return { result: applyFilters(response, options), cacheKey: cacheKey ?? undefined };
 }
 
 function applyFilters(response: AnalysisResponse, options: AnalyzeOptions): AnalysisResponse {
@@ -259,7 +265,6 @@ function applyFilters(response: AnalysisResponse, options: AnalyzeOptions): Anal
     if (!include.has("recommendations")) response.recommendations = [];
     if (!include.has("circuits")) response.circuits = [];
     if (!include.has("compilation")) {
-      delete response.compilation;
       delete response.compilations;
     }
   }

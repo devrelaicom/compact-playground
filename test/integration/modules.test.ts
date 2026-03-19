@@ -46,7 +46,7 @@ export circuit getBalance(): Uint<64> {
     expect(analysis2.ledger).toHaveLength(2);
 
     // Diff them
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.added).toHaveLength(1);
@@ -66,7 +66,7 @@ export circuit hello(): [] {}`;
 
 export circuit hello(): [] {}`;
 
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.pragma.changed).toBe(true);
@@ -85,7 +85,7 @@ export circuit hello(): [] {}`;
   return (a + b + c) as Uint<64>;
 }`;
 
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.modified).toHaveLength(1);
@@ -104,7 +104,7 @@ export circuit increment(): [] {
   counter.increment(1n);
 }`;
 
-    const diff = await diffContracts(code, code);
+    const { result: diff } = await diffContracts(code, code);
 
     expect(diff.hasChanges).toBe(false);
     expect(diff.circuits.added).toHaveLength(0);
@@ -172,7 +172,7 @@ describe("Integration: Version resolution", () => {
 describe("Integration: Format endpoint", () => {
   it("formats code using compact CLI", async () => {
     const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     expect(result.formatted).toBeDefined();
@@ -184,7 +184,7 @@ describe("Integration: Format endpoint", () => {
   it("always returns diff when code changed", async () => {
     const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
     // No diff option — diff should still be returned when changed
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     if (result.changed) {
@@ -198,15 +198,16 @@ describe("Integration: Format endpoint", () => {
   return (a + b) as Uint<64>;
 }
 `;
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     expect(result.changed).toBe(false);
   });
 
   it("returns error for empty input", async () => {
-    const result = await formatCode("");
+    const { result } = await formatCode("");
     expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
+    expect(result.errors).toBeDefined();
+    expect(result.errors?.length).toBeGreaterThan(0);
   });
 });
