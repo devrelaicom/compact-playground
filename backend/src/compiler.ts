@@ -214,7 +214,7 @@ async function collectBindings(outputDir: string): Promise<Record<string, string
   try {
     const entries = await readdir(outputDir, { recursive: true });
     for (const entry of entries) {
-      if (entry.endsWith(".ts")) {
+      if (entry.endsWith(".ts") || entry.endsWith(".js") || entry.endsWith(".cjs")) {
         const content = await readFile(join(outputDir, entry), "utf-8");
         bindings[entry] = content;
       }
