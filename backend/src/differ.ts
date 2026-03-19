@@ -1,6 +1,7 @@
 import { parseSource } from "./analysis/parser.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
 import type { ParsedCircuit, ParsedLedgerField } from "./analysis/types.js";
+import type { DiffError } from "./types.js";
 
 export interface CircuitDiff {
   name: string;
@@ -16,6 +17,8 @@ export interface LedgerDiff {
 }
 
 export interface DiffResult {
+  success: boolean;
+  errors?: DiffError[];
   hasChanges: boolean;
   circuits: {
     added: ParsedCircuit[];
@@ -36,10 +39,12 @@ export interface DiffResult {
     added: string[];
     removed: string[];
   };
-  cacheKey?: string;
 }
 
-export async function diffContracts(before: string, after: string): Promise<DiffResult> {
+export async function diffContracts(
+  before: string,
+  after: string,
+): Promise<{ result: DiffResult; cacheKey?: string }> {
   // Check cache
   const cache = getFileCache();
   const cacheKey = cache ? generateCacheKey(before + "\x00" + after, "none", {}) : null;
@@ -47,7 +52,7 @@ export async function diffContracts(before: string, after: string): Promise<Diff
   if (cache && cacheKey) {
     const cached = await cache.get<DiffResult>("diff", cacheKey);
     if (cached) {
-      return cached;
+      return { result: cached, cacheKey };
     }
   }
 
@@ -123,17 +128,17 @@ export async function diffContracts(before: string, after: string): Promise<Diff
     pragmaChanged;
 
   const result: DiffResult = {
+    success: true,
     hasChanges,
     circuits: { added: addedCircuits, removed: removedCircuits, modified: modifiedCircuits },
     ledger: { added: addedLedger, removed: removedLedger, modified: modifiedLedger },
     pragma: { before: beforeAnalysis.pragma, after: afterAnalysis.pragma, changed: pragmaChanged },
     imports: { added: addedImports, removed: removedImports },
-    cacheKey: cacheKey ?? undefined,
   };
 
   if (cache && cacheKey) {
     await cache.set("diff", cacheKey, result);
   }
 
-  return result;
+  return { result, cacheKey: cacheKey ?? undefined };
 }

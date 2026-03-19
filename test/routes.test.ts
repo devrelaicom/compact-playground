@@ -511,8 +511,15 @@ describe("POST /diff", () => {
   });
 
   it("valid before+after → 200", async () => {
-    const diffResult = { changes: [], linesAdded: 0, linesRemoved: 0 };
-    mockDiffContracts.mockResolvedValue(diffResult);
+    const diffResult = {
+      success: true,
+      hasChanges: false,
+      circuits: {},
+      ledger: {},
+      pragma: {},
+      imports: {},
+    };
+    mockDiffContracts.mockResolvedValue({ result: diffResult, cacheKey: "mock-key" });
 
     const res = await app.request("/diff", {
       method: "POST",
@@ -523,6 +530,7 @@ describe("POST /diff", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
+    expect(body.cacheKey).toBe("mock-key");
   });
 
   it("missing before → 400 with validation error", async () => {

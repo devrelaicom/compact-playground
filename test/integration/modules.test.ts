@@ -46,7 +46,7 @@ export circuit getBalance(): Uint<64> {
     expect(analysis2.ledger).toHaveLength(2);
 
     // Diff them
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.added).toHaveLength(1);
@@ -66,7 +66,7 @@ export circuit hello(): [] {}`;
 
 export circuit hello(): [] {}`;
 
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.pragma.changed).toBe(true);
@@ -85,7 +85,7 @@ export circuit hello(): [] {}`;
   return (a + b + c) as Uint<64>;
 }`;
 
-    const diff = await diffContracts(v1, v2);
+    const { result: diff } = await diffContracts(v1, v2);
 
     expect(diff.hasChanges).toBe(true);
     expect(diff.circuits.modified).toHaveLength(1);
@@ -104,7 +104,7 @@ export circuit increment(): [] {
   counter.increment(1n);
 }`;
 
-    const diff = await diffContracts(code, code);
+    const { result: diff } = await diffContracts(code, code);
 
     expect(diff.hasChanges).toBe(false);
     expect(diff.circuits.added).toHaveLength(0);

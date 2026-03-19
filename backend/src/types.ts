@@ -16,3 +16,6 @@ export type FormatterError = ExecutableError;
 
 /** Error from proof analysis. */
 export type ProofAnalysisError = ExecutableError;
+
+/** Error from contract diffing. */
+export type DiffError = ExecutableError;
