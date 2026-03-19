@@ -39,7 +39,7 @@ compileRoutes.post("/compile", async (c) => {
       const results: CompileResult[] = mvResults.map((r) => {
         const { requestedVersion, error, ...rest } = r;
         delete (rest as Record<string, unknown>).version;
-        const mapped = { ...rest, requestedVersion } as CompileResult;
+        const mapped = { ...rest, requestedVersion } as unknown as CompileResult;
 
         // Convert runMultiVersion's rejected-promise error into errors[]
         if (error && !mapped.errors) {
