@@ -209,4 +209,83 @@ circuit internal(): [] {}`;
       expect(result.circuits).toEqual([]);
     });
   });
+
+  describe("comment / string resilience", () => {
+    it("ignores circuit keyword inside a line comment", () => {
+      const code = `// export circuit fake(): [] {}
+export circuit real(): [] {}`;
+      const result = parseSource(code);
+      expect(result.circuits).toHaveLength(1);
+      expect(result.circuits[0].name).toBe("real");
+    });
+
+    it("ignores circuit keyword inside a block comment", () => {
+      const code = `/* export circuit fake(): [] {} */
+export circuit real(): [] {}`;
+      const result = parseSource(code);
+      expect(result.circuits).toHaveLength(1);
+      expect(result.circuits[0].name).toBe("real");
+    });
+
+    it("ignores ledger keyword inside a string literal", () => {
+      const code = `export circuit example(): [] {
+  const msg = "ledger counter: Counter;";
+}`;
+      const result = parseSource(code);
+      expect(result.circuits).toHaveLength(1);
+      expect(result.ledger).toHaveLength(0);
+    });
+
+    it("ignores witness keyword inside a block comment", () => {
+      const code = `/* witness secret: () => Field; */
+export circuit foo(): [] {}`;
+      const result = parseSource(code);
+      expect(result.witnesses).toHaveLength(0);
+      expect(result.circuits).toHaveLength(1);
+    });
+
+    it("handles braces inside string literals within circuit body", () => {
+      const code = `export circuit test(): [] {
+  const s = "{ not a real brace }";
+  counter.increment(1);
+}`;
+      const result = parseSource(code);
+      expect(result.circuits).toHaveLength(1);
+      expect(result.circuits[0].body).toContain("counter.increment");
+    });
+
+    it("handles braces inside comments within circuit body", () => {
+      const code = `export circuit test(): [] {
+  // { nested comment brace
+  counter.increment(1);
+  /* } another comment brace */
+}`;
+      const result = parseSource(code);
+      expect(result.circuits).toHaveLength(1);
+      expect(result.circuits[0].body).toContain("counter.increment");
+    });
+
+    it("ignores import keyword inside a comment", () => {
+      const code = `// import FakeLib;
+import CompactStandardLibrary;`;
+      const result = parseSource(code);
+      expect(result.imports).toEqual(["CompactStandardLibrary"]);
+    });
+
+    it("ignores enum keyword inside a block comment", () => {
+      const code = `/* enum Fake { A, B } */
+export enum Real { X, Y }`;
+      const result = parseSource(code);
+      expect(result.enums).toHaveLength(1);
+      expect(result.enums[0].name).toBe("Real");
+    });
+
+    it("handles deeply nested generics in parameter types", () => {
+      const code = `export circuit foo(m: Map<Bytes<32>, Map<Field, Uint<64>>>): [] {}`;
+      const result = parseSource(code);
+      expect(result.circuits[0].parameters).toEqual([
+        { name: "m", type: "Map<Bytes<32>, Map<Field, Uint<64>>>" },
+      ]);
+    });
+  });
 });
