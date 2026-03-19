@@ -13,3 +13,6 @@ export interface ExecutableError {
 
 /** Error from the Compact formatter. */
 export type FormatterError = ExecutableError;
+
+/** Error from proof analysis. */
+export type ProofAnalysisError = ExecutableError;

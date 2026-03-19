@@ -27,29 +27,26 @@ proveRoutes.post("/prove", async (c) => {
     const cache = getFileCache();
     const cacheKey = cache ? generateCacheKey(code, "none", { endpoint: "prove" }) : null;
 
-    if (cache && cacheKey) {
-      const cached = await cache.get("prove", cacheKey);
-      if (cached) {
-        const result = cached as ReturnType<typeof buildProofAnalysis>;
-        if (circuit) {
-          return c.json({
-            ...result,
-            circuits: result.circuits.filter((ci) => ci.circuit === circuit),
-            cacheKey,
-          });
-        }
-        return c.json({ ...result, cacheKey });
+    const cached =
+      cache && cacheKey
+        ? await cache.get<ReturnType<typeof buildProofAnalysis>>("prove", cacheKey)
+        : null;
+
+    let result: ReturnType<typeof buildProofAnalysis>;
+
+    if (cached) {
+      result = cached;
+    } else {
+      const source = parseSource(code);
+      const model = buildSemanticModel(source);
+      result = buildProofAnalysis(model);
+
+      if (cache && cacheKey) {
+        await cache.set("prove", cacheKey, result);
       }
     }
 
-    const source = parseSource(code);
-    const model = buildSemanticModel(source);
-    let result = buildProofAnalysis(model);
-
-    if (cache && cacheKey) {
-      await cache.set("prove", cacheKey, result);
-    }
-
+    // Filter by circuit name if requested
     if (circuit) {
       result = {
         ...result,
@@ -63,8 +60,12 @@ proveRoutes.post("/prove", async (c) => {
     return c.json(
       {
         success: false,
-        error: "Internal server error",
-        message: error instanceof Error ? error.message : "An unknown error occurred",
+        errors: [
+          {
+            message: error instanceof Error ? error.message : "An unknown error occurred",
+            severity: "error" as const,
+          },
+        ],
       },
       500,
     );

@@ -5,6 +5,7 @@ import type {
   CircuitOperations,
   ParsedCircuit,
 } from "./types.js";
+import type { ProofAnalysisError } from "../types.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -42,12 +43,12 @@ export interface CircuitProofAnalysis {
 
 export interface ProofAnalysisResponse {
   success: boolean;
+  errors?: ProofAnalysisError[];
   contract: {
     publicState: Array<{ name: string; type: string }>;
     privateState: Array<{ name: string; type: string }>;
   };
   circuits: CircuitProofAnalysis[];
-  cacheKey?: string;
 }
 
 // ── Main entry point ────────────────────────────────────────────────
