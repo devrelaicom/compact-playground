@@ -8,5 +8,9 @@ export default defineConfig({
     globals: false,
     testTimeout: 10000,
     setupFiles: ["test/setup.ts"],
+    // Many test files call resetConfig() which clears the global config
+    // singleton. Running files in parallel causes race conditions where
+    // one file's resetConfig() breaks another file's getConfig() call.
+    fileParallelism: false,
   },
 });
