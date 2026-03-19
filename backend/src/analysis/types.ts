@@ -163,6 +163,8 @@ export interface CircuitExplanation {
   privacyConsiderations: string[];
 }
 
+import type { AnalysisError } from "../types.js";
+
 // ── Analysis Response (canonical schema) ─────────────────────────────
 
 export interface AnalysisSummary {
@@ -247,6 +249,7 @@ export interface CircuitAnalysis {
 
 export interface AnalysisResponse {
   success: boolean;
+  errors?: AnalysisError[];
   mode: "fast" | "deep";
   diagnostics: ParseDiagnostic[];
   summary: AnalysisSummary;

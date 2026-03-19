@@ -28,7 +28,12 @@ analyzeRoutes.post("/analyze", async (c) => {
     return c.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred",
+        errors: [
+          {
+            message: error instanceof Error ? error.message : "An unknown error occurred",
+            severity: "error" as const,
+          },
+        ],
       },
       500,
     );
