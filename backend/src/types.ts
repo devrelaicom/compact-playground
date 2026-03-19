@@ -19,3 +19,6 @@ export type ProofAnalysisError = ExecutableError;
 
 /** Error from contract diffing. */
 export type DiffError = ExecutableError;
+
+/** Error from contract visualization. */
+export type VisualizationError = ExecutableError;

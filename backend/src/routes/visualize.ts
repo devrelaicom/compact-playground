@@ -4,6 +4,7 @@ import { visualizeBodySchema } from "../request-schemas.js";
 import { parseSource } from "../analysis/parser.js";
 import { buildSemanticModel } from "../analysis/semantic-model.js";
 import { generateContractGraph } from "../visualizer.js";
+import type { VisualizationResult } from "../visualizer.js";
 
 const visualizeRoutes = new Hono();
 
@@ -27,17 +28,20 @@ visualizeRoutes.post("/visualize", async (c) => {
     const model = buildSemanticModel(source);
     const graph = generateContractGraph(source, model);
 
-    return c.json({ success: true, graph });
+    const result: VisualizationResult = { success: true, graph };
+    return c.json(result);
   } catch (error) {
     console.error("Visualization error:", error);
-    return c.json(
-      {
-        success: false,
-        error: "Internal server error",
-        message: error instanceof Error ? error.message : "An unknown error occurred",
-      },
-      500,
-    );
+    const result: VisualizationResult = {
+      success: false,
+      errors: [
+        {
+          message: error instanceof Error ? error.message : "An unknown error occurred",
+          severity: "error",
+        },
+      ],
+    };
+    return c.json(result, 500);
   }
 });
 
