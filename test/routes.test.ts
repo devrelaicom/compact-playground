@@ -297,7 +297,7 @@ describe("POST /format", () => {
 
   it("valid code → 200, returns format result", async () => {
     const formatResult = { success: true, formatted: "formatted code" };
-    mockFormatCode.mockResolvedValue(formatResult);
+    mockFormatCode.mockResolvedValue({ result: formatResult, cacheKey: "mock-key" });
 
     const res = await app.request("/format", {
       method: "POST",
@@ -307,8 +307,12 @@ describe("POST /format", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.success).toBe(true);
-    expect(body.formatted).toBe("formatted code");
+    const results = body.results as Record<string, unknown>[];
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].formatted).toBe("formatted code");
+    expect(results[0].requestedVersion).toBe("default");
+    expect(body.cacheKey).toBe("mock-key");
   });
 
   it("missing code → 400", async () => {

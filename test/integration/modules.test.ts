@@ -172,7 +172,7 @@ describe("Integration: Version resolution", () => {
 describe("Integration: Format endpoint", () => {
   it("formats code using compact CLI", async () => {
     const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     expect(result.formatted).toBeDefined();
@@ -184,7 +184,7 @@ describe("Integration: Format endpoint", () => {
   it("always returns diff when code changed", async () => {
     const code = `export circuit add(a:Uint<64>,b:Uint<64>):Uint<64>{return (a+b) as Uint<64>;}`;
     // No diff option — diff should still be returned when changed
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     if (result.changed) {
@@ -198,15 +198,16 @@ describe("Integration: Format endpoint", () => {
   return (a + b) as Uint<64>;
 }
 `;
-    const result = await formatCode(code);
+    const { result } = await formatCode(code);
 
     expect(result.success).toBe(true);
     expect(result.changed).toBe(false);
   });
 
   it("returns error for empty input", async () => {
-    const result = await formatCode("");
+    const { result } = await formatCode("");
     expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
+    expect(result.errors).toBeDefined();
+    expect(result.errors?.length).toBeGreaterThan(0);
   });
 });
