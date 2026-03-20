@@ -26,6 +26,25 @@ RUN git init /opt/oz-compact \
     && git checkout FETCH_HEAD \
     && rm -rf .git .github
 
+# OZ Simulator build stage — install deps and compile TypeScript
+FROM node:25-slim AS oz-builder
+COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
+WORKDIR /opt/oz-compact
+# Install all dependencies (including devDeps needed for build)
+RUN if [ -f package-lock.json ]; then npm ci; \
+    elif [ -f package.json ]; then npm install; fi
+# Build the simulator package
+WORKDIR /opt/oz-compact/packages/simulator
+RUN if [ -f package.json ]; then \
+      npm install; \
+      npm run build; \
+    fi
+# Prune dev dependencies after build
+WORKDIR /opt/oz-compact
+RUN npm prune --omit=dev 2>/dev/null || true
+WORKDIR /opt/oz-compact/packages/simulator
+RUN npm prune --omit=dev 2>/dev/null || true
+
 # Production stage
 FROM node:25-slim AS production
 
@@ -78,8 +97,8 @@ RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
 RUN compact --version && compact list --installed
 
 # ── OpenZeppelin Compact Dependencies ──────────────────────────────────
-# Copied from oz-clone stage (pinned commit, no .git overhead)
-COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
+# Copied from oz-builder stage (built simulator + pruned deps)
+COPY --from=oz-builder /opt/oz-compact /opt/oz-compact
 
 # Set up OZ environment variables
 ENV OZ_CONTRACTS_PATH=/opt/oz-compact/contracts/src
