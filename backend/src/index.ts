@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -13,9 +15,12 @@ import { cachedResponseRoutes } from "./routes/cached-response.js";
 import { simulateRoutes } from "./routes/simulate.js";
 import { proveRoutes } from "./routes/prove.js";
 import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
-
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
+
+const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8")) as {
+  version: string;
+};
 
 const app = new Hono();
 
@@ -50,7 +55,7 @@ app.route("/", healthRoutes);
 app.get("/", (c) => {
   return c.json({
     name: "Compact Playground API",
-    version: "2.0.0",
+    version: pkg.version,
     description: "Compile, format, analyze, and diff Compact smart contracts",
     endpoints: {
       "POST /compile": 'Compile Compact code (versions: ["latest", "detect", or specific])',
