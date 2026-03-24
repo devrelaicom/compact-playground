@@ -322,7 +322,7 @@ All settings are controlled via environment variables:
 | `CACHE_MAX_SIZE` | `1000` | Max cache entries |
 | `CACHE_TTL` | `3600000` | Cache TTL in ms (1 hour) |
 | `MAX_CODE_SIZE` | `102400` | Max code size in bytes (100 KB) |
-| `MAX_VERSIONS_PER_REQUEST` | `10` | Max versions in a multi-version request |
+| `MAX_VERSIONS_PER_REQUEST` | `3` | Max versions in a multi-version request |
 | `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
 | `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
 
