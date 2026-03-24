@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { getConfig } from "./config.js";
+import { setupLogging, startupLog } from "./logger.js";
 import { compileRoutes } from "./routes/compile.js";
 import { archiveCompileRoutes } from "./routes/compile-archive.js";
 import { formatRoutes } from "./routes/format.js";
@@ -27,8 +27,10 @@ const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"
 
 const app = new Hono();
 
+// Initialize structured logging
+await setupLogging();
+
 // Middleware
-app.use("*", logger());
 app.use(
   "*",
   cors({
@@ -91,49 +93,44 @@ app.get("/", (c) => {
 // Start server
 const port = getConfig().port;
 
-console.log(`
-╔═══════════════════════════════════════════════════╗
-║           Compact Playground API                  ║
-║           Starting on port ${String(port)}                    ║
-╚═══════════════════════════════════════════════════╝
-`);
+startupLog.info("Compact Playground API starting on port {port}", { port });
 
 // Validate critical runtime dependencies before accepting traffic
 const startupCheck = await validateStartup();
 if (!startupCheck.ok) {
   for (const error of startupCheck.errors) {
-    console.error(`STARTUP ERROR: ${error}`);
+    startupLog.error("STARTUP ERROR: {error}", { error });
   }
   process.exit(1);
 }
-console.log("Startup validation passed");
+startupLog.info("Startup validation passed");
 
 // Sweep stale temp directories at startup and periodically
 const SWEEP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 sweepStaleTempDirs()
   .then(({ swept, errors }) => {
     if (swept > 0 || errors > 0) {
-      console.log(`Startup temp sweep: ${String(swept)} removed, ${String(errors)} errors`);
+      startupLog.info("Startup temp sweep: {swept} removed, {errors} errors", { swept, errors });
     }
   })
   .catch((err: unknown) => {
-    console.warn("Failed to sweep temp directories:", err);
+    startupLog.warn("Failed to sweep temp directories: {error}", { error: String(err) });
   });
 setInterval(() => {
   sweepStaleTempDirs()
     .then(({ swept, errors }) => {
       if (swept > 0 || errors > 0) {
-        console.log(`Periodic temp sweep: ${String(swept)} removed, ${String(errors)} errors`);
+        startupLog.info("Periodic temp sweep: {swept} removed, {errors} errors", { swept, errors });
       }
     })
     .catch((err: unknown) => {
-      console.warn("Periodic temp sweep failed:", err);
+      startupLog.warn("Periodic temp sweep failed: {error}", { error: String(err) });
     });
 }, SWEEP_INTERVAL_MS).unref();
 
 if (!getConfig().cacheKeySalt) {
-  console.warn(
-    "WARNING: CACHE_KEY_SALT is not set. Cache keys are deterministic and " +
+  startupLog.warn(
+    "CACHE_KEY_SALT is not set. Cache keys are deterministic and " +
       "cached responses may be retrievable by anyone who can reconstruct inputs.",
   );
 }
@@ -144,19 +141,19 @@ if (fileCache) {
   fileCache
     .init()
     .then(() => {
-      console.log("File cache initialized");
+      startupLog.info("File cache initialized");
     })
     .catch((err: unknown) => {
-      console.warn("Failed to initialize file cache:", err);
+      startupLog.warn("Failed to initialize file cache: {error}", { error: String(err) });
     });
 }
 
 warmVersionsCache()
   .then(() => {
-    console.log("Versions cache warmed");
+    startupLog.info("Versions cache warmed");
   })
   .catch((err: unknown) => {
-    console.warn("Failed to warm versions cache:", err);
+    startupLog.warn("Failed to warm versions cache: {error}", { error: String(err) });
   });
 
 const server = serve({
@@ -166,4 +163,4 @@ const server = serve({
 
 registerShutdownHandlers(server);
 
-console.log(`Server running at http://localhost:${String(port)}`);
+startupLog.info("Server running at http://localhost:{port}", { port });

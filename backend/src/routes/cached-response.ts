@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getFileCache } from "../cache.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const cachedResponseRoutes = new Hono();
 
@@ -56,7 +57,10 @@ cachedResponseRoutes.get("/cached-response/:hash", async (c) => {
 
     return c.json(data);
   } catch (error) {
-    console.error("Cached response lookup error:", error);
+    routeLog.error("Cached response lookup error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/cached-response",
+    });
     return c.json(
       {
         success: false,

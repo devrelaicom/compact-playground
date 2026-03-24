@@ -3,6 +3,7 @@ import { formatCode, type FormatResult } from "../formatter.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { formatBodySchema } from "../request-schemas.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const formatRoutes = new Hono();
 
@@ -53,7 +54,7 @@ formatRoutes.post("/format", async (c) => {
       cacheKey,
     });
   } catch (error) {
-    console.error("Format error:", error);
+    routeLog.error("Format error: {error}", { error: safeErrorMessage(error), route: "/format" });
     return c.json(
       {
         success: false,

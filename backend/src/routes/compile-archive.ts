@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { compileArchive } from "../archive-compiler.js";
 import { ArchiveValidationError, validateArchiveFormat } from "../archive.js";
 import { checkArchiveRateLimit, getClientIp } from "../rate-limit.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const MAX_COMPRESSED_SIZE = 1 * 1024 * 1024; // 1 MB
 
@@ -115,7 +116,10 @@ archiveCompileRoutes.post(
         return c.json({ success: false, error: "Validation error", message: error.message }, 400);
       }
 
-      console.error("Archive compilation error:", error);
+      routeLog.error("Archive compilation error: {error}", {
+        error: safeErrorMessage(error),
+        route: "/compile/archive",
+      });
       return c.json(
         {
           success: false,

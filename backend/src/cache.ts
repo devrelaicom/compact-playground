@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { mkdir, readFile, writeFile, rename, unlink, readdir, stat } from "fs/promises";
 import { join, dirname } from "path";
 import { getConfig } from "./config.js";
+import { log } from "./logger.js";
 
 /** Normalize code for cache key generation (lightweight, no formatter needed) */
 export function normalizeForCacheKey(code: string): string {
@@ -82,7 +83,9 @@ export class FileCache {
 
     // Purge expired and over-limit entries
     await this.purge();
-    console.log(`FileCache initialized: ${String(this.index.size)} entries loaded from disk`);
+    log.info("FileCache initialized: {entries} entries loaded from disk", {
+      entries: this.index.size,
+    });
   }
 
   private async walkDir(dir: string, endpoint: string): Promise<void> {
@@ -205,7 +208,7 @@ export class FileCache {
         this.purge().catch(() => {});
       }
     } catch (err) {
-      console.warn("FileCache write error:", err);
+      log.warn("FileCache write error: {error}", { error: String(err) });
     }
   }
 

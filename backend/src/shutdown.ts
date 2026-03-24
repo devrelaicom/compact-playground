@@ -1,4 +1,5 @@
 import type { Server } from "node:net";
+import { log } from "./logger.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000; // 10 seconds
 
@@ -20,16 +21,18 @@ export function resetShutdownState(): void {
 export function initiateShutdown(server: Server, signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`${signal} received, shutting down gracefully...`);
+  log.info("{signal} received, shutting down gracefully...", { signal });
 
   server.close(() => {
-    console.log("All connections closed, exiting");
+    log.info("All connections closed, exiting");
     process.exit(0);
   });
 
   // Force exit if connections don't drain in time
   setTimeout(() => {
-    console.warn(`Shutdown timed out after ${String(SHUTDOWN_TIMEOUT_MS)}ms, forcing exit`);
+    log.warn("Shutdown timed out after {timeout}ms, forcing exit", {
+      timeout: SHUTDOWN_TIMEOUT_MS,
+    });
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
 }

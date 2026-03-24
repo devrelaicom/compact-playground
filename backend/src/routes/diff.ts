@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { diffContracts } from "../differ.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { diffBodySchema } from "../request-schemas.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const diffRoutes = new Hono();
 
@@ -24,7 +25,7 @@ diffRoutes.post("/diff", async (c) => {
     const { result, cacheKey } = await diffContracts(before, after);
     return c.json({ ...result, cacheKey });
   } catch (error) {
-    console.error("Diff error:", error);
+    routeLog.error("Diff error: {error}", { error: safeErrorMessage(error), route: "/diff" });
     return c.json(
       {
         success: false,

@@ -3,6 +3,7 @@ import { compile, type CompileResult } from "../compiler.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { compileBodySchema } from "../request-schemas.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const compileRoutes = new Hono();
 
@@ -61,7 +62,10 @@ compileRoutes.post("/compile", async (c) => {
       cacheKey,
     });
   } catch (error) {
-    console.error("Compilation error:", error);
+    routeLog.error("Compilation error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/compile",
+    });
     return c.json(
       {
         success: false,
