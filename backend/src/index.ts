@@ -15,6 +15,7 @@ import { cachedResponseRoutes } from "./routes/cached-response.js";
 import { simulateRoutes } from "./routes/simulate.js";
 import { proveRoutes } from "./routes/prove.js";
 import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
+import { validateStartup } from "./startup.js";
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
 
@@ -86,6 +87,16 @@ console.log(`
 ║           Starting on port ${String(port)}                    ║
 ╚═══════════════════════════════════════════════════╝
 `);
+
+// Validate critical runtime dependencies before accepting traffic
+const startupCheck = await validateStartup();
+if (!startupCheck.ok) {
+  for (const error of startupCheck.errors) {
+    console.error(`STARTUP ERROR: ${error}`);
+  }
+  process.exit(1);
+}
+console.log("Startup validation passed");
 
 // Initialize file cache and warm versions cache at startup
 const fileCache = getFileCache();
