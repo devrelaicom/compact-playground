@@ -227,13 +227,13 @@ pause
 banner "7. Compile — Multiple Versions"
 
 describe "Pass multiple versions to compile against all of them in parallel.
-Results are returned per version. 0.29.0 should succeed (language 0.21.0 satisfies
+Results are returned per version. 0.30.0 should succeed (language 0.22.0 satisfies
 pragma >= 0.21), while older versions show expected mismatches.
 Using the same counter.compact code from above."
 
-CMD="curl -s $API/compile -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"versions\": [\"0.29.0\", \"0.26.0\", \"0.24.0\"]}'"
+CMD="curl -s $API/compile -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"versions\": [\"0.30.0\", \"0.29.0\", \"0.26.0\"]}'"
 
-show_request "POST /compile  (counter.compact, versions 0.29.0 + 0.26.0 + 0.24.0)"
+show_request "POST /compile  (counter.compact, versions 0.30.0 + 0.29.0 + 0.26.0)"
 pause
 send_request "$CMD"
 pause
@@ -484,9 +484,9 @@ banner "20. Analyze — Deep Mode (Multiple Versions)"
 describe "Deep analysis across multiple compiler versions shows which versions
 successfully compile the code. Each version gets its own compilation result."
 
-CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"deep\", \"versions\": [\"0.29.0\", \"0.26.0\", \"0.24.0\"]}'"
+CMD="curl -s $API/analyze -H 'Content-Type: application/json' -d '{\"code\": $CODE, \"mode\": \"deep\", \"versions\": [\"0.30.0\", \"0.29.0\", \"0.26.0\"]}'"
 
-show_request "POST /analyze  (counter.compact, deep mode, versions 0.29.0 + 0.26.0 + 0.24.0)"
+show_request "POST /analyze  (counter.compact, deep mode, versions 0.30.0 + 0.29.0 + 0.26.0)"
 pause
 send_request "$CMD"
 pause

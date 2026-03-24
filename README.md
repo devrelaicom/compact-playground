@@ -86,7 +86,7 @@ curl http://localhost:8080/compile \
 {
   "success": true,
   "results": [
-    {"version": "0.29.0", "requestedVersion": "latest", "success": true, "output": "Compilation successful", "executionTime": 3100},
+    {"version": "0.30.0", "requestedVersion": "latest", "success": true, "output": "Compilation successful", "executionTime": 3100},
     {"version": "0.26.0", "requestedVersion": "0.26.0", "success": false, "errors": [{"message": "language version 0.18.0 mismatch", "severity": "error"}]}
   ]
 }
@@ -215,8 +215,8 @@ curl http://localhost:8080/analyze \
     "success": true,
     "diagnostics": [],
     "executionTime": 3200,
-    "compilerVersion": "0.29.0",
-    "languageVersion": "0.21.0"
+    "compilerVersion": "0.30.0",
+    "languageVersion": "0.22.0"
   }
 }
 ```
@@ -261,8 +261,9 @@ curl http://localhost:8080/versions
 **Response:**
 ```json
 {
-  "default": "0.29.0",
+  "default": "0.30.0",
   "installed": [
+    {"version": "0.30.0", "languageVersion": "0.22.0"},
     {"version": "0.29.0", "languageVersion": "0.21.0"},
     {"version": "0.28.0", "languageVersion": "0.20.0"},
     {"version": "0.26.0", "languageVersion": "0.18.0"},
@@ -286,8 +287,8 @@ curl http://localhost:8080/health
 ```json
 {
   "status": "healthy",
-  "compactCli": {"installed": true, "version": "0.4.0"},
-  "defaultVersion": {"configured": "latest", "resolved": "0.29.0", "valid": true},
+  "compactCli": {"installed": true, "version": "0.5.0"},
+  "defaultVersion": {"configured": "latest", "resolved": "0.30.0", "valid": true},
   "timestamp": "2026-03-09T14:00:00.000Z"
 }
 ```

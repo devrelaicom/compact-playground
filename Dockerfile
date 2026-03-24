@@ -36,6 +36,9 @@ WORKDIR /opt/oz-compact
 RUN npm install -g --force corepack && corepack enable && corepack prepare
 # Install all workspace dependencies (including devDeps needed for build)
 RUN yarn install
+# Upgrade compact-runtime to match what the latest compiler (0.30.0) emits.
+# The OZ repo pins 0.14.0 but compiler 0.30.0 generates bindings expecting 0.15.0.
+RUN yarn up @midnight-ntwrk/compact-runtime@0.15.0
 # Build the simulator package (tsc -p .)
 WORKDIR /opt/oz-compact/packages/simulator
 RUN yarn build
@@ -62,8 +65,8 @@ WORKDIR /app
 ENV HOME="/root"
 RUN mkdir -p /root/.compact/bin
 
-# Download Compact CLI tool (compact-v0.4.0)
-RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compact-v0.4.0/compact-x86_64-unknown-linux-musl.tar.xz \
+# Download Compact CLI tool (compact-v0.5.0)
+RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compact-v0.5.0/compact-x86_64-unknown-linux-musl.tar.xz \
        -o /tmp/compact.tar.xz \
     && mkdir -p /tmp/compact-extract \
     && tar -xJf /tmp/compact.tar.xz -C /tmp/compact-extract \
@@ -78,7 +81,8 @@ ENV PATH="/root/.compact/bin:$PATH"
 ARG DEFAULT_COMPILER=latest
 
 # Pre-install all available compiler versions
-RUN compact update 0.29.0 \
+RUN compact update 0.30.0 \
+    && compact update 0.29.0 \
     && compact update 0.28.0 \
     && compact update 0.26.0 \
     && compact update 0.25.0 \
@@ -86,11 +90,11 @@ RUN compact update 0.29.0 \
     && compact update 0.23.0 \
     && compact update 0.22.0
 
-# Set the CLI default — explicit version or latest (0.29.0)
+# Set the CLI default — explicit version or latest (0.30.0)
 RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
       compact update "$DEFAULT_COMPILER"; \
     else \
-      compact update 0.29.0; \
+      compact update 0.30.0; \
     fi
 
 # Verify installation

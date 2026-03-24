@@ -27,12 +27,12 @@ When a user submits code:
 The Dockerfile installs the Compact CLI and pre-installs multiple compiler versions:
 
 ### 1. Compact CLI (`compact`)
-- Release: `compact-v0.4.0`
+- Release: `compact-v0.5.0`
 - Purpose: Toolchain manager that handles compiler version selection and subcommands
 
 ### 2. Compiler Versions
 Pre-installed via `compact update <version>` during Docker build:
-- 0.29.0, 0.28.0, 0.26.0, 0.25.0, 0.24.0, 0.23.0, 0.22.0
+- 0.30.0, 0.29.0, 0.28.0, 0.26.0, 0.25.0, 0.24.0, 0.23.0, 0.22.0
 
 The CLI's `compact update` command downloads and installs compiler versions. At runtime, version selection works as follows:
 - **Compilation**: `compact compile +VERSION --skip-zk <source> <output>`
@@ -75,7 +75,7 @@ To add a new compiler version:
 All POST endpoints that compile code accept version selection:
 - `"latest"` -- newest installed compiler
 - `"detect"` -- parse `pragma language_version` from source to find the best compiler match, fall back to default
-- Specific version (e.g. `"0.29.0"`) -- must be installed
+- Specific version (e.g. `"0.30.0"`) -- must be installed
 - `versions` array -- run the operation against multiple compiler versions in parallel
 
 ### Compile Options
