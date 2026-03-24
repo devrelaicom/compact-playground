@@ -17,6 +17,7 @@ import { proveRoutes } from "./routes/prove.js";
 import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
 import { validateStartup } from "./startup.js";
 import { sweepStaleTempDirs } from "./temp-sweeper.js";
+import { isShuttingDown, registerShutdownHandlers } from "./shutdown.js";
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
 
@@ -36,6 +37,14 @@ app.use(
     allowHeaders: ["Content-Type"],
   }),
 );
+
+// Reject new requests during shutdown (before any body parsing)
+app.use("*", async (c, next) => {
+  if (isShuttingDown()) {
+    return c.json({ success: false, error: "Service is shutting down" }, 503);
+  }
+  return next();
+});
 
 app.use("*", createJsonBodyLimit());
 app.use("*", validateRequestBody);
@@ -143,9 +152,11 @@ warmVersionsCache()
     console.warn("Failed to warm versions cache:", err);
   });
 
-serve({
+const server = serve({
   fetch: app.fetch,
   port,
 });
+
+registerShutdownHandlers(server);
 
 console.log(`Server running at http://localhost:${String(port)}`);
