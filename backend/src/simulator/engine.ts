@@ -33,6 +33,7 @@ export async function deployContract(request: DeployRequest): Promise<Simulation
 
     const { result: compileResult } = await compile(request.code, {
       includeBindings: true,
+      skipZk: false,
     });
 
     if (!compileResult.success) {

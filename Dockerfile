@@ -27,23 +27,23 @@ RUN git init /opt/oz-compact \
     && rm -rf .git .github
 
 # OZ Simulator build stage — install deps and compile TypeScript
+# The OZ repo uses Yarn 4 workspaces (not npm), so we enable corepack.
 FROM node:25-slim AS oz-builder
 COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
 WORKDIR /opt/oz-compact
-# Install all dependencies (including devDeps needed for build)
-RUN if [ -f package-lock.json ]; then npm ci; \
-    elif [ -f package.json ]; then npm install; fi
-# Build the simulator package
+# Enable corepack so the repo's packageManager field activates Yarn 4
+# (corepack is no longer bundled in Node 25, install it first)
+RUN npm install -g --force corepack && corepack enable && corepack prepare
+# Install all workspace dependencies (including devDeps needed for build)
+RUN yarn install
+# Build the simulator package (tsc -p .)
 WORKDIR /opt/oz-compact/packages/simulator
-RUN if [ -f package.json ]; then \
-      npm install; \
-      npm run build; \
-    fi
-# Prune dev dependencies after build
+RUN yarn build
+# Remove build tooling and test files to keep the production image lean.
+# We keep node_modules (has compact-runtime) and dist/ (built simulator).
 WORKDIR /opt/oz-compact
-RUN npm prune --omit=dev 2>/dev/null || true
-WORKDIR /opt/oz-compact/packages/simulator
-RUN npm prune --omit=dev 2>/dev/null || true
+RUN rm -rf .yarn/cache packages/simulator/src packages/simulator/test \
+    && find . -name "*.tsbuildinfo" -delete
 
 # Production stage
 FROM node:25-slim AS production

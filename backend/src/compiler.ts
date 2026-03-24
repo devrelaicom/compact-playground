@@ -112,12 +112,10 @@ export async function compile(
       compileArgs.push(`+${compilerVersion}`);
     }
 
-    // When includeBindings is requested, we need full compilation (not --skip-zk)
-    // because --skip-zk only checks syntax and doesn't produce output artifacts
-    const effectiveSkipZk = options.includeBindings ? false : options.skipZk;
-
-    // Use --skip-zk for faster compilation (syntax checking only)
-    if (effectiveSkipZk !== false) {
+    // --skip-zk skips ZK proof key generation but still produces TypeScript
+    // bindings and all other output artifacts. Only disable it when the caller
+    // explicitly sets skipZk: false (e.g. for insights that need full ZK data).
+    if (options.skipZk !== false) {
       compileArgs.push("--skip-zk");
     }
 
