@@ -1,5 +1,5 @@
 # Build stage
-FROM node:25-slim AS builder
+FROM node:24-slim AS builder
 
 WORKDIR /app
 
@@ -28,12 +28,11 @@ RUN git init /opt/oz-compact \
 
 # OZ Simulator build stage — install deps and compile TypeScript
 # The OZ repo uses Yarn 4 workspaces (not npm), so we enable corepack.
-FROM node:25-slim AS oz-builder
+FROM node:24-slim AS oz-builder
 COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
 WORKDIR /opt/oz-compact
 # Enable corepack so the repo's packageManager field activates Yarn 4
-# (corepack is no longer bundled in Node 25, install it first)
-RUN npm install -g --force corepack && corepack enable && corepack prepare
+RUN corepack enable && corepack prepare
 # Install all workspace dependencies (including devDeps needed for build)
 RUN yarn install
 # Upgrade compact-runtime to match what the latest compiler (0.30.0) emits.
@@ -49,7 +48,7 @@ RUN rm -rf .yarn/cache packages/simulator/src packages/simulator/test \
     && find . -name "*.tsbuildinfo" -delete
 
 # Production stage
-FROM node:25-slim AS production
+FROM node:24-slim AS production
 
 # Install required packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
