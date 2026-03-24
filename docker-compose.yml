@@ -7,8 +7,17 @@ services:
       - PORT=8080
       - DEFAULT_COMPILER_VERSION=${DEFAULT_COMPILER_VERSION:-latest}
       - CACHE_ENABLED=${CACHE_ENABLED:-true}
-      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-1000}
+      - CACHE_DIR=/data/cache
+      - CACHE_MAX_DISK_MB=${CACHE_MAX_DISK_MB:-800}
+      - CACHE_MAX_ENTRIES=${CACHE_MAX_ENTRIES:-50000}
+      - CACHE_TTL=${CACHE_TTL:-2592000000}
+      - TEMP_DIR=/tmp/compact-playground
       - RATE_LIMIT=${RATE_LIMIT:-20}
+      - RATE_WINDOW=${RATE_WINDOW:-60000}
+      - ARCHIVE_RATE_LIMIT=${ARCHIVE_RATE_LIMIT:-10}
+      - ARCHIVE_RATE_WINDOW=${ARCHIVE_RATE_WINDOW:-60000}
+    volumes:
+      - cache_data:/data/cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -16,3 +25,6 @@ services:
       start_period: 30s
       retries: 3
     restart: unless-stopped
+
+volumes:
+  cache_data:
