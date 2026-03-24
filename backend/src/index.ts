@@ -12,7 +12,7 @@ import { visualizeRoutes } from "./routes/visualize.js";
 import { cachedResponseRoutes } from "./routes/cached-response.js";
 import { simulateRoutes } from "./routes/simulate.js";
 import { proveRoutes } from "./routes/prove.js";
-import { validateRequestBody } from "./middleware.js";
+import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
 
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
@@ -30,6 +30,7 @@ app.use(
   }),
 );
 
+app.use("*", createJsonBodyLimit());
 app.use("*", validateRequestBody);
 
 // Mount routes

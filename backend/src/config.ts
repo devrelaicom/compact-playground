@@ -13,6 +13,7 @@ export interface Config {
   cacheTtl: number;
   maxVersionsPerRequest: number;
   maxCodeSize: number;
+  maxJsonBodySize: number;
   archiveRateLimit: number;
   archiveRateWindow: number;
   trustCloudflare: boolean;
@@ -41,6 +42,7 @@ export function getConfig(): Config {
     cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
     maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "10", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
+    maxJsonBodySize: parseInt(process.env.MAX_JSON_BODY_SIZE || String(512 * 1024), 10),
     archiveRateLimit: parseInt(process.env.ARCHIVE_RATE_LIMIT || "10", 10),
     archiveRateWindow: parseInt(process.env.ARCHIVE_RATE_WINDOW || "60000", 10),
     trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",

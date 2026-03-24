@@ -1,6 +1,35 @@
 import type { Context, Next } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { getConfig } from "./config.js";
 import { resolveRequestedVersion } from "./version-manager.js";
+
+/**
+ * Hono middleware that enforces an HTTP body size limit on JSON POST endpoints.
+ * Rejects oversized requests with 413 before the body is parsed into memory.
+ * Skips the /compile/archive multipart endpoint (which has its own limit).
+ */
+export function createJsonBodyLimit() {
+  const config = getConfig();
+  const limiter = bodyLimit({
+    maxSize: config.maxJsonBodySize,
+    onError: (c) =>
+      c.json(
+        {
+          success: false,
+          error: "Payload too large",
+          message: `Request body must be less than ${String(Math.floor(config.maxJsonBodySize / 1024))}KB`,
+        },
+        413,
+      ),
+  });
+
+  return (c: Context, next: Next) => {
+    if (c.req.path === "/compile/archive") {
+      return next();
+    }
+    return limiter(c as never, next);
+  };
+}
 
 /**
  * Hono middleware that validates request bodies for POST endpoints.
