@@ -16,6 +16,7 @@ import { simulateRoutes } from "./routes/simulate.js";
 import { proveRoutes } from "./routes/prove.js";
 import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
 import { validateStartup } from "./startup.js";
+import { sweepStaleTempDirs } from "./temp-sweeper.js";
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
 
@@ -97,6 +98,29 @@ if (!startupCheck.ok) {
   process.exit(1);
 }
 console.log("Startup validation passed");
+
+// Sweep stale temp directories at startup and periodically
+const SWEEP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+sweepStaleTempDirs()
+  .then(({ swept, errors }) => {
+    if (swept > 0 || errors > 0) {
+      console.log(`Startup temp sweep: ${String(swept)} removed, ${String(errors)} errors`);
+    }
+  })
+  .catch((err: unknown) => {
+    console.warn("Failed to sweep temp directories:", err);
+  });
+setInterval(() => {
+  sweepStaleTempDirs()
+    .then(({ swept, errors }) => {
+      if (swept > 0 || errors > 0) {
+        console.log(`Periodic temp sweep: ${String(swept)} removed, ${String(errors)} errors`);
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn("Periodic temp sweep failed:", err);
+    });
+}, SWEEP_INTERVAL_MS).unref();
 
 // Initialize file cache and warm versions cache at startup
 const fileCache = getFileCache();
