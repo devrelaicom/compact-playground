@@ -573,10 +573,13 @@ pause
 
 banner "25. Simulate — Deploy Contract"
 
-describe "POST /simulate/deploy deploys a contract for interactive simulation.
-It parses the contract, creates a session with initial ledger state, and
-returns a sessionId for subsequent calls. Sessions expire after 15 minutes of inactivity.
-Max 100 concurrent sessions."
+describe "POST /simulate/deploy compiles a contract using the Compact compiler, extracts
+TypeScript bindings, and instantiates a real OZ Compact Simulator for interactive
+execution. Returns a sessionId for subsequent calls. Sessions expire after 15 minutes
+of inactivity. Max 100 concurrent sessions.
+
+Note: Deploy is slower than other endpoints (~1-5s) because it performs a full
+compilation with bindings extraction before creating the simulator instance."
 
 CODE=$(json_escape counter.compact)
 CMD="curl -s $API/simulate/deploy -H 'Content-Type: application/json' -d '{\"code\": $CODE}'"
@@ -605,9 +608,10 @@ else
 
   banner "26. Simulate — Call Circuit"
 
-  describe "POST /simulate/:sessionId/call executes a circuit on the deployed contract.
-It simulates state mutations and returns changes, updated ledger state, and
-the full call history. Let's call 'increment' twice to see the counter change."
+  describe "POST /simulate/:sessionId/call executes a circuit on the deployed contract
+using the OZ Compact Simulator — real compiled logic, not heuristic simulation.
+Returns actual state changes, updated ledger state, and call history.
+Let's call 'increment' twice to see the counter change."
 
   CMD="curl -s $API/simulate/$SESSION_ID/call -H 'Content-Type: application/json' -d '{\"circuit\": \"increment\"}'"
 
@@ -622,9 +626,24 @@ the full call history. Let's call 'increment' twice to see the counter change."
   send_request "$CMD"
   pause
 
-  # ─── 27. Simulate — Get State ───────────────────────────────────────────
+  # ─── 27. Simulate — Call with Caller Context ──────────────────────────
 
-  banner "27. Simulate — Session State"
+  banner "27. Simulate — Call with Caller Context"
+
+  describe "The optional 'caller' parameter sets the transaction sender identity for
+a single call. This is injected into the OZ simulator so circuits that check the
+caller (e.g., access control) see the correct address. The caller resets after each call."
+
+  CMD="curl -s $API/simulate/$SESSION_ID/call -H 'Content-Type: application/json' -d '{\"circuit\": \"increment\", \"caller\": \"0100000000000000000000000000000000000000000000000000000000000000\"}'"
+
+  show_request "POST /simulate/$SESSION_ID/call  (circuit: increment, with caller context)"
+  pause
+  send_request "$CMD"
+  pause
+
+  # ─── 28. Simulate — Get State ───────────────────────────────────────────
+
+  banner "28. Simulate — Session State"
 
   describe "GET /simulate/:sessionId/state returns the current session state including
 ledger values, available circuits, call history, and session expiration time."
@@ -636,9 +655,9 @@ ledger values, available circuits, call history, and session expiration time."
   send_request "$CMD"
   pause
 
-  # ─── 28. Simulate — Delete Session ──────────────────────────────────────
+  # ─── 29. Simulate — Delete Session ──────────────────────────────────────
 
-  banner "28. Simulate — Delete Session"
+  banner "29. Simulate — Delete Session"
 
   describe "DELETE /simulate/:sessionId ends the simulation session and frees resources."
 
@@ -651,9 +670,9 @@ ledger values, available circuits, call history, and session expiration time."
 
 fi  # end SESSION_ID check
 
-# ─── 29. Cached Response ────────────────────────────────────────────────────
+# ─── 30. Cached Response ────────────────────────────────────────────────────
 
-banner "29. Cached Response Lookup"
+banner "30. Cached Response Lookup"
 
 describe "Most endpoints include a 'cacheKey' field in their response — a SHA-256
 hash of the request. You can retrieve any cached result later via
@@ -688,9 +707,9 @@ else
   pause
 fi
 
-# ─── 30. Root ────────────────────────────────────────────────────────────────
+# ─── 31. Root ────────────────────────────────────────────────────────────────
 
-banner "30. API Index"
+banner "31. API Index"
 
 describe "The root endpoint lists all available endpoints."
 
@@ -714,8 +733,8 @@ echo "  POST /analyze                 - 5-stage analysis pipeline (fast / deep)"
 echo "  POST /visualize               - Contract architecture graph (DAG + Mermaid)"
 echo "  POST /prove                   - ZK privacy boundary analysis"
 echo "  POST /diff                    - Semantic contract diff"
-echo "  POST /simulate/deploy         - Deploy contract for simulation"
-echo "  POST /simulate/:id/call       - Call circuit on simulated contract"
+echo "  POST /simulate/deploy         - Compile + deploy contract via OZ simulator"
+echo "  POST /simulate/:id/call       - Execute circuit with real compiled logic"
 echo "  GET  /simulate/:id/state      - Get simulation session state"
 echo "  DELETE /simulate/:id          - End simulation session"
 echo "  GET  /cached-response/:hash   - Retrieve cached result by hash"
@@ -731,6 +750,10 @@ echo "  mode: fast      - Source-level analysis (no compilation)"
 echo "  mode: deep      - Analysis + compilation diagnostics"
 echo "  include: [...]  - Filter response sections (findings, recommendations, etc.)"
 echo "  circuit: name   - Focus analysis on a single circuit"
+echo ""
+echo "Simulate features:"
+echo "  caller: \"0x...\"  - Set transaction sender identity for access control"
+echo "  Real circuit execution via OZ Compact Simulator (not heuristic)"
 echo ""
 echo "Special version values:"
 echo "  \"detect\" - Auto-select compiler based on pragma in source code"

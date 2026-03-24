@@ -1,5 +1,10 @@
+import { join } from "path";
+import { mkdir } from "fs/promises";
+import { v4 as uuidv4 } from "uuid";
 import { parseSource } from "../analysis/parser.js";
-import { buildSemanticModel } from "../analysis/semantic-model.js";
+import { compile } from "../compiler.js";
+import { getConfig } from "../config.js";
+import { createContractSimulator } from "./oz-factory.js";
 import type {
   CircuitInfo,
   LedgerState,
@@ -8,13 +13,14 @@ import type {
   CallRequest,
   SimulationResult,
 } from "./types.js";
-import { createSession, getSession } from "./session-manager.js";
+import {
+  createSession,
+  getSession,
+  getSimulatorHandle,
+  setSimulatorHandle,
+} from "./session-manager.js";
 
-export function deployContract(request: DeployRequest): Promise<SimulationResult> {
-  return Promise.resolve(_deployContract(request));
-}
-
-function _deployContract(request: DeployRequest): SimulationResult {
+export async function deployContract(request: DeployRequest): Promise<SimulationResult> {
   if (!request.code || request.code.trim().length === 0) {
     return {
       success: false,
@@ -24,28 +30,84 @@ function _deployContract(request: DeployRequest): SimulationResult {
 
   try {
     const source = parseSource(request.code);
-    const model = buildSemanticModel(source);
 
-    const circuits: CircuitInfo[] = model.circuits.map((c) => ({
-      name: c.parsed.name,
-      isPublic: c.parsed.isExported,
-      isPure: c.parsed.isPure,
-      parameters: c.parsed.parameters.map((p) => ({ name: p.name, type: p.type })),
-      returnType: c.parsed.returnType,
-      readsLedger: c.operations.readsLedger,
-      writesLedger: c.operations.writesLedger,
-    }));
+    const { result: compileResult } = await compile(request.code, {
+      includeBindings: true,
+      skipZk: false,
+    });
 
-    const initialLedger: LedgerState = {};
-    for (const field of source.ledger) {
-      initialLedger[field.name] = {
-        type: field.type,
-        value: getDefaultValue(field.type),
+    if (!compileResult.success) {
+      return {
+        success: false,
+        errors: compileResult.errors?.map((e) => ({
+          message: e.message,
+          severity: e.severity,
+        })) ?? [{ message: "Compilation failed", severity: "error" }],
       };
     }
 
+    if (!compileResult.bindings || Object.keys(compileResult.bindings).length === 0) {
+      return {
+        success: false,
+        errors: [{ message: "Compilation produced no bindings", severity: "error" }],
+      };
+    }
+
+    const config = getConfig();
+    const sessionDir = join(config.tempDir, `sim-${uuidv4()}`);
+    await mkdir(sessionDir, { recursive: true });
+
+    let handle;
+    try {
+      handle = await createContractSimulator(compileResult.bindings, sessionDir);
+    } catch (err) {
+      return {
+        success: false,
+        errors: [
+          {
+            message: `Failed to create simulator: ${err instanceof Error ? err.message : "Unknown error"}`,
+            severity: "error",
+          },
+        ],
+      };
+    }
+
+    const simCircuits = handle.getCircuits();
+    const allSimCircuitNames = new Set([...simCircuits.pure, ...simCircuits.impure]);
+
+    const circuits: CircuitInfo[] = source.circuits
+      .filter((c) => allSimCircuitNames.has(c.name))
+      .map((c) => ({
+        name: c.name,
+        isPublic: c.isExported,
+        isPure: c.isPure,
+        parameters: c.parameters.map((p) => ({ name: p.name, type: p.type })),
+        returnType: c.returnType,
+        readsLedger: [],
+        writesLedger: [],
+      }));
+
+    for (const name of allSimCircuitNames) {
+      if (!circuits.some((c) => c.name === name)) {
+        circuits.push({
+          name,
+          isPublic: true,
+          isPure: simCircuits.pure.includes(name),
+          parameters: [],
+          returnType: "unknown",
+          readsLedger: [],
+          writesLedger: [],
+        });
+      }
+    }
+
+    const publicState = handle.getPublicState();
+    const ledgerTypeMap = buildLedgerTypeMap(source.ledger);
+    const initialLedger = convertPublicState(publicState, ledgerTypeMap);
+
     const session = createSession(request.code, circuits, initialLedger);
     if (!session) {
+      await handle.cleanup();
       return {
         success: false,
         errors: [
@@ -57,8 +119,12 @@ function _deployContract(request: DeployRequest): SimulationResult {
         ],
       };
     }
+
+    setSimulatorHandle(session.id, handle);
+
     if (request.caller) {
       session.caller = request.caller;
+      handle.setCaller(request.caller);
     }
 
     return {
@@ -74,7 +140,7 @@ function _deployContract(request: DeployRequest): SimulationResult {
       success: false,
       errors: [
         {
-          message: err instanceof Error ? err.message : "Failed to parse contract",
+          message: err instanceof Error ? err.message : "Failed to deploy contract",
           severity: "error",
         },
       ],
@@ -102,6 +168,21 @@ function _callCircuit(sessionId: string, request: CallRequest): SimulationResult
     };
   }
 
+  const handle = getSimulatorHandle(sessionId);
+  if (!handle) {
+    return {
+      success: false,
+      sessionId,
+      errors: [
+        {
+          message: "Simulator instance not found for session",
+          severity: "error",
+          errorCode: "SESSION_NOT_FOUND",
+        },
+      ],
+    };
+  }
+
   const circuit = session.circuits.find((c) => c.name === request.circuit);
   if (!circuit) {
     const available = session.circuits.map((c) => c.name).join(", ");
@@ -118,24 +199,45 @@ function _callCircuit(sessionId: string, request: CallRequest): SimulationResult
     };
   }
 
-  const stateChanges: StateChange[] = [];
+  if (request.caller) {
+    handle.setCaller(request.caller);
+  }
 
-  if (!circuit.isPure) {
-    for (const field of circuit.writesLedger) {
-      if (!(field in session.ledgerState)) continue;
-      const current = session.ledgerState[field];
-      const previousValue = current.value;
-      const newValue = simulateMutation(current, request.parameters);
-      session.ledgerState[field] = { ...current, value: newValue };
+  const ledgerTypeMap = buildLedgerTypeMapFromState(session.ledgerState);
+  const stateBefore = handle.getPublicState();
 
-      stateChanges.push({
-        field,
-        operation: "write",
-        previousValue,
-        newValue,
-      });
+  const args = convertParameters(circuit.parameters, request.parameters);
+
+  try {
+    if (circuit.isPure) {
+      handle.callPure(request.circuit, ...args);
+    } else {
+      handle.callImpure(request.circuit, ...args);
+    }
+  } catch (err) {
+    return {
+      success: false,
+      sessionId,
+      errors: [
+        {
+          message: `Circuit execution failed: ${err instanceof Error ? err.message : String(err)}`,
+          severity: "error",
+        },
+      ],
+    };
+  }
+
+  if (request.caller) {
+    handle.resetCaller();
+    if (session.caller) {
+      handle.setCaller(session.caller);
     }
   }
+
+  const stateAfter = handle.getPublicState();
+  const stateChanges = computeStateChanges(stateBefore, stateAfter);
+
+  session.ledgerState = convertPublicState(stateAfter, ledgerTypeMap);
 
   session.callHistory.push({
     circuit: request.circuit,
@@ -145,7 +247,6 @@ function _callCircuit(sessionId: string, request: CallRequest): SimulationResult
     stateChanges,
   });
 
-  // Return circuits with stateChanges populated on the called circuit
   const circuits = session.circuits.map((c) =>
     c.name === request.circuit ? { ...c, stateChanges } : c,
   );
@@ -160,35 +261,121 @@ function _callCircuit(sessionId: string, request: CallRequest): SimulationResult
   };
 }
 
-function getDefaultValue(type: string): string {
-  if (type.startsWith("Counter") || type.startsWith("Uint") || type.startsWith("Int")) {
-    return "0";
+function buildLedgerTypeMap(fields: Array<{ name: string; type: string }>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const f of fields) {
+    map.set(f.name, f.type);
   }
-  if (type.startsWith("Bytes") || type === "Field") {
-    return "0x0";
-  }
-  if (type === "Boolean" || type === "Bool") {
-    return "false";
-  }
-  if (type.startsWith("Map") || type.startsWith("Set")) {
-    return "{}";
-  }
-  return "undefined";
+  return map;
 }
 
-function simulateMutation(
-  current: { type: string; value: string },
-  params?: Record<string, string>,
-): string {
-  if (current.type.startsWith("Counter") || current.type.startsWith("Uint")) {
-    const currentVal = BigInt(current.value || "0");
-    if (params) {
-      const amount = Object.values(params).find((v) => /^\d+$/.test(v));
-      if (amount) {
-        return String(currentVal + BigInt(amount));
-      }
-    }
-    return String(currentVal + 1n);
+function buildLedgerTypeMapFromState(state: LedgerState): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [field, info] of Object.entries(state)) {
+    map.set(field, info.type);
   }
-  return current.value;
+  return map;
+}
+
+function convertPublicState(
+  publicState: Record<string, unknown>,
+  typeMap: Map<string, string>,
+): LedgerState {
+  const result: LedgerState = {};
+  for (const [field, value] of Object.entries(publicState)) {
+    const type = typeMap.get(field) ?? inferType(value);
+    result[field] = {
+      type,
+      value: valueToString(value),
+    };
+  }
+  return result;
+}
+
+function valueToString(value: unknown): string {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value;
+  if (value instanceof Uint8Array) {
+    return (
+      "0x" +
+      Array.from(value)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+    );
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "symbol") return value.toString();
+  if (typeof value === "function") return "[function]";
+  return "unknown";
+}
+
+function inferType(value: unknown): string {
+  if (typeof value === "bigint") return "Uint<64>";
+  if (typeof value === "boolean") return "Boolean";
+  if (typeof value === "number") return "Uint<64>";
+  if (value instanceof Uint8Array) return `Bytes<${String(value.length)}>`;
+  if (value instanceof Map) return "Map";
+  if (value instanceof Set) return "Set";
+  return "unknown";
+}
+
+function convertParameters(
+  paramMeta: Array<{ name: string; type: string }>,
+  params?: Record<string, string>,
+): unknown[] {
+  if (!params || paramMeta.length === 0) return [];
+  return paramMeta.map((meta) => {
+    if (!(meta.name in params)) return undefined;
+    return coerceValue(params[meta.name], meta.type);
+  });
+}
+
+function coerceValue(value: string, type: string): unknown {
+  if (
+    type.startsWith("Counter") ||
+    type.startsWith("Uint") ||
+    type.startsWith("Int") ||
+    type === "Field"
+  ) {
+    try {
+      return BigInt(value);
+    } catch {
+      return value;
+    }
+  }
+  if (type === "Boolean" || type === "Bool") {
+    return value === "true";
+  }
+  if (type.startsWith("Bytes")) {
+    const hex = value.startsWith("0x") ? value.slice(2) : value;
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+    }
+    return bytes;
+  }
+  return value;
+}
+
+function computeStateChanges(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): StateChange[] {
+  const changes: StateChange[] = [];
+  for (const field of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const prevStr = valueToString(before[field]);
+    const newStr = valueToString(after[field]);
+    if (prevStr !== newStr) {
+      changes.push({
+        field,
+        operation: "write",
+        previousValue: prevStr,
+        newValue: newStr,
+      });
+    }
+  }
+  return changes;
 }

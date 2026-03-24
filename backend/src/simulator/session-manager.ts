@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
-import type { SimulationSession, CircuitInfo, LedgerState } from "./types.js";
+import type { SimulationSession, CircuitInfo, LedgerState, SimulatorHandle } from "./types.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_SESSIONS = 100;
 
 const sessions = new Map<string, SimulationSession>();
+const simulatorHandles = new Map<string, SimulatorHandle>();
 
 // Periodic cleanup of expired sessions (every 5 minutes)
 setInterval(
@@ -41,7 +42,7 @@ export function getSession(id: string): SimulationSession | undefined {
   const session = sessions.get(id);
   if (!session) return undefined;
   if (Date.now() > session.expiresAt) {
-    sessions.delete(id);
+    removeSession(id);
     return undefined;
   }
   // Refresh TTL on access (inactivity-based expiry)
@@ -50,7 +51,15 @@ export function getSession(id: string): SimulationSession | undefined {
 }
 
 export function deleteSession(id: string): boolean {
-  return sessions.delete(id);
+  return removeSession(id);
+}
+
+export function getSimulatorHandle(id: string): SimulatorHandle | undefined {
+  return simulatorHandles.get(id);
+}
+
+export function setSimulatorHandle(id: string, handle: SimulatorHandle): void {
+  simulatorHandles.set(id, handle);
 }
 
 export function listSessions(): SimulationSession[] {
@@ -58,7 +67,7 @@ export function listSessions(): SimulationSession[] {
   const active: SimulationSession[] = [];
   for (const [id, session] of sessions) {
     if (now > session.expiresAt) {
-      sessions.delete(id);
+      removeSession(id);
     } else {
       active.push(session);
     }
@@ -71,7 +80,7 @@ export function cleanupExpired(): number {
   let removed = 0;
   for (const [id, session] of sessions) {
     if (now > session.expiresAt) {
-      sessions.delete(id);
+      removeSession(id);
       removed++;
     }
   }
@@ -79,5 +88,19 @@ export function cleanupExpired(): number {
 }
 
 export function resetSessions(): void {
+  for (const handle of simulatorHandles.values()) {
+    handle.cleanup().catch(() => {});
+  }
   sessions.clear();
+  simulatorHandles.clear();
+}
+
+/** Remove a session and clean up its simulator handle. */
+function removeSession(id: string): boolean {
+  const handle = simulatorHandles.get(id);
+  if (handle) {
+    handle.cleanup().catch(() => {});
+    simulatorHandles.delete(id);
+  }
+  return sessions.delete(id);
 }

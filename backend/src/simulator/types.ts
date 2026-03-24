@@ -61,3 +61,15 @@ export interface SimulationResult {
   callHistory?: CircuitCallRecord[];
   expiresAt?: string;
 }
+
+/** Handle to an instantiated OZ contract simulator. */
+export interface SimulatorHandle {
+  callPure(name: string, ...args: unknown[]): unknown;
+  callImpure(name: string, ...args: unknown[]): unknown;
+  getPublicState(): Record<string, unknown>;
+  getPrivateState(): unknown;
+  getCircuits(): { pure: string[]; impure: string[] };
+  setCaller(coinPK: string): void;
+  resetCaller(): void;
+  cleanup(): Promise<void>;
+}
