@@ -131,6 +131,13 @@ setInterval(() => {
     });
 }, SWEEP_INTERVAL_MS).unref();
 
+if (!getConfig().cacheKeySalt) {
+  console.warn(
+    "WARNING: CACHE_KEY_SALT is not set. Cache keys are deterministic and " +
+      "cached responses may be retrievable by anyone who can reconstruct inputs.",
+  );
+}
+
 // Initialize file cache and warm versions cache at startup
 const fileCache = getFileCache();
 if (fileCache) {

@@ -8,6 +8,7 @@ import {
   generateCacheKey,
   generateArchiveCacheKey,
 } from "../backend/src/cache.js";
+import { resetConfig } from "../backend/src/config.js";
 
 describe("FileCache", () => {
   let tempDir: string;
@@ -210,5 +211,66 @@ describe("generateArchiveCacheKey", () => {
     const a = generateArchiveCacheKey(archive, "0.26.0", { optimize: true });
     const b = generateArchiveCacheKey(archive, "0.26.0", { optimize: false });
     expect(a).not.toBe(b);
+  });
+});
+
+describe("CACHE_KEY_SALT", () => {
+  beforeEach(() => {
+    delete process.env.CACHE_KEY_SALT;
+    resetConfig();
+  });
+
+  afterEach(() => {
+    delete process.env.CACHE_KEY_SALT;
+    resetConfig();
+  });
+
+  it("generateCacheKey produces different keys with different salts", () => {
+    process.env.CACHE_KEY_SALT = "salt-a";
+    resetConfig();
+    const a = generateCacheKey("code", "0.26.0", {});
+
+    process.env.CACHE_KEY_SALT = "salt-b";
+    resetConfig();
+    const b = generateCacheKey("code", "0.26.0", {});
+
+    expect(a).not.toBe(b);
+  });
+
+  it("generateArchiveCacheKey produces different keys with different salts", () => {
+    const archive = Buffer.from("archive content");
+
+    process.env.CACHE_KEY_SALT = "salt-a";
+    resetConfig();
+    const a = generateArchiveCacheKey(archive, "0.26.0", {});
+
+    process.env.CACHE_KEY_SALT = "salt-b";
+    resetConfig();
+    const b = generateArchiveCacheKey(archive, "0.26.0", {});
+
+    expect(a).not.toBe(b);
+  });
+
+  it("unsalted keys match the previous (no salt) behavior", () => {
+    // No CACHE_KEY_SALT set — default empty string
+    resetConfig();
+    const unsalted = generateCacheKey("code", "0.26.0", {});
+
+    // Same inputs, still no salt
+    resetConfig();
+    const unsalted2 = generateCacheKey("code", "0.26.0", {});
+
+    expect(unsalted).toBe(unsalted2);
+  });
+
+  it("salted key differs from unsalted key", () => {
+    resetConfig();
+    const unsalted = generateCacheKey("code", "0.26.0", {});
+
+    process.env.CACHE_KEY_SALT = "my-secret";
+    resetConfig();
+    const salted = generateCacheKey("code", "0.26.0", {});
+
+    expect(salted).not.toBe(unsalted);
   });
 });
