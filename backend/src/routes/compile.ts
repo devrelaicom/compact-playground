@@ -4,6 +4,7 @@ import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { compileBodySchema } from "../request-schemas.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
+import { ExecutionQueueFullError } from "../execution-limiter.js";
 
 const compileRoutes = new Hono();
 
@@ -62,6 +63,17 @@ compileRoutes.post("/compile", async (c) => {
       cacheKey,
     });
   } catch (error) {
+    if (error instanceof ExecutionQueueFullError) {
+      return c.json(
+        {
+          success: false,
+          error: "Service busy",
+          message: "The server is under heavy load. Please try again shortly.",
+        },
+        503,
+      );
+    }
+
     routeLog.error("Compilation error: {error}", {
       error: safeErrorMessage(error),
       route: "/compile",
