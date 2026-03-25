@@ -3,9 +3,9 @@ FROM node:25-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and build configs
 COPY package*.json ./
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 
 # Install all dependencies (including dev for building)
 RUN npm ci
@@ -13,8 +13,8 @@ RUN npm ci
 # Copy source code
 COPY backend/ ./backend/
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript for production (no source maps, no declarations, no tests)
+RUN npx tsc -p tsconfig.build.json
 
 # OZ Compact dependencies stage — clone in a lightweight image, keep git out of production
 FROM alpine/git AS oz-clone
