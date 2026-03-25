@@ -113,15 +113,18 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
 
-# Create temp directory for compilation
-RUN mkdir -p /tmp/compact-playground
-
-# Create persistent cache directory
-RUN mkdir -p /data/cache
+# Create non-root user and writable directories
+RUN groupadd --system appgroup \
+    && useradd --system --no-log-init --gid appgroup --home-dir /home/appuser --create-home appuser \
+    && mkdir -p /tmp/compact-playground /data/cache \
+    && mv /root/.compact /home/appuser/.compact \
+    && chown -R appuser:appgroup /home/appuser/.compact /tmp/compact-playground /data/cache /app
 
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV HOME=/home/appuser
+ENV PATH="/home/appuser/.compact/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV TEMP_DIR=/tmp/compact-playground
 ENV COMPACT_CLI_PATH=compact
 ENV DEFAULT_COMPILER_VERSION=$DEFAULT_COMPILER
@@ -137,6 +140,9 @@ EXPOSE 8080
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
+
+# Switch to non-root user
+USER appuser
 
 # Start the server
 CMD ["node", "dist/backend/src/index.js"]
