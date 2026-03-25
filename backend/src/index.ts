@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -144,7 +144,10 @@ if (config.usingEphemeralCacheSalt) {
   );
 
   try {
-    await rm(config.cacheDir, { recursive: true, force: true });
+    const entries = await readdir(config.cacheDir);
+    await Promise.all(
+      entries.map((entry) => rm(join(config.cacheDir, entry), { recursive: true, force: true })),
+    );
   } catch (err: unknown) {
     startupLog.warn("Failed to clear cache directory for ephemeral salt: {error}", {
       error: String(err),
