@@ -31,7 +31,7 @@ diffRoutes.post("/diff", async (c) => {
         success: false,
         errors: [
           {
-            message: error instanceof Error ? error.message : "An unknown error occurred",
+            message: "An unexpected error occurred during processing",
             severity: "error" as const,
           },
         ],

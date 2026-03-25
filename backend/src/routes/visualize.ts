@@ -32,7 +32,7 @@ visualizeRoutes.post("/visualize", async (c) => {
     if (cache && cacheKey) {
       const cached = await cache.get<VisualizationResult>("visualize", cacheKey);
       if (cached) {
-        return c.json({ ...cached, cacheKey });
+        return c.json({ ...cached, cacheKey: cache.getPublicIdForKey(cacheKey) });
       }
     }
 
@@ -43,10 +43,11 @@ visualizeRoutes.post("/visualize", async (c) => {
     const result: VisualizationResult = { success: true, graph };
 
     if (cache && cacheKey) {
-      await cache.set("visualize", cacheKey, result);
+      const publicCacheKey = await cache.set("visualize", cacheKey, result);
+      return c.json({ ...result, cacheKey: publicCacheKey });
     }
 
-    return c.json({ ...result, cacheKey: cacheKey ?? undefined });
+    return c.json({ ...result, cacheKey: undefined });
   } catch (error) {
     routeLog.error("Visualization error: {error}", {
       error: safeErrorMessage(error),
@@ -56,7 +57,7 @@ visualizeRoutes.post("/visualize", async (c) => {
       success: false,
       errors: [
         {
-          message: error instanceof Error ? error.message : "An unknown error occurred",
+          message: "An unexpected error occurred during processing",
           severity: "error",
         },
       ],

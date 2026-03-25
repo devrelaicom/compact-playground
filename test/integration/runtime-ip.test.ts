@@ -1,8 +1,25 @@
+import { createServer } from "node:net";
 import { describe, it, expect, afterAll } from "vitest";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { getClientIp } from "../../backend/src/rate-limit.js";
 import { resetConfig } from "../../backend/src/config.js";
+
+async function canBindLoopbackPort(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = createServer();
+
+    probe.once("error", () => {
+      resolve(false);
+    });
+
+    probe.listen(0, "127.0.0.1", () => {
+      probe.close(() => {
+        resolve(true);
+      });
+    });
+  });
+}
 
 /**
  * Adapter-level integration test for runtime IP extraction.
@@ -20,7 +37,11 @@ describe("Runtime IP via @hono/node-server adapter", () => {
     resetConfig();
   });
 
-  it("extracts loopback IP from adapter when no trust flags are set", async () => {
+  it("extracts loopback IP from adapter when no trust flags are set", async ({ skip }) => {
+    if (!(await canBindLoopbackPort())) {
+      skip();
+    }
+
     // Ensure no trust flags — getClientIp should fall through to runtime IP
     delete process.env.TRUST_PROXY;
     delete process.env.TRUST_CLOUDFLARE;

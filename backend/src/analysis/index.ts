@@ -145,7 +145,10 @@ export async function analyzeContract(
     const cached = await cache.get<AnalysisResponse>("analyze", cacheKey);
     if (cached) {
       // Apply post-processing filters on cached result
-      return { result: applyFilters(cached, options), cacheKey };
+      return {
+        result: applyFilters(cached, options),
+        cacheKey: cache.getPublicIdForKey(cacheKey),
+      };
     }
   }
 
@@ -236,11 +239,12 @@ export async function analyzeContract(
 
   // Cache the full unfiltered result for fast mode
   if (cache && cacheKey) {
-    await cache.set("analyze", cacheKey, response);
+    const publicCacheKey = await cache.set("analyze", cacheKey, response);
+    return { result: applyFilters(response, options), cacheKey: publicCacheKey };
   }
 
   // Apply post-processing filters
-  return { result: applyFilters(response, options), cacheKey: cacheKey ?? undefined };
+  return { result: applyFilters(response, options), cacheKey: undefined };
 }
 
 function applyFilters(response: AnalysisResponse, options: AnalyzeOptions): AnalysisResponse {

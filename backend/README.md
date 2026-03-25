@@ -11,7 +11,7 @@ When a user submits code:
 3. Code is written to a temp directory
 4. The appropriate `compact` subcommand is executed (compile, format, etc.) with the requested compiler version
 5. Output/errors are parsed and returned as JSON
-6. Results are cached to disk (SHA-256 keyed) for subsequent lookups
+6. Results are cached to disk and exposed via opaque cache tokens for subsequent lookups
 7. Temp files are cleaned up
 
 ## Compact Repositories
@@ -64,11 +64,7 @@ To add a new compiler version:
 | `POST /visualize` | Visualize | Contract architecture graph (DAG + Mermaid diagram) |
 | `POST /prove` | Prove | ZK privacy boundary analysis |
 | `POST /diff` | Diff | Semantic diff between two contract versions |
-| `POST /simulate/deploy` | Simulate Deploy | Deploy a contract for interactive simulation |
-| `POST /simulate/:id/call` | Simulate Call | Execute a circuit on a simulated contract |
-| `GET /simulate/:id/state` | Simulate State | Get current simulation session state |
-| `DELETE /simulate/:id` | Simulate Delete | End a simulation session |
-| `GET /cached-response/:hash` | Cache Lookup | Retrieve any cached result by SHA-256 hash |
+| `GET /cached-response/:hash` | Cache Lookup | Retrieve any cached result by opaque cache token |
 
 ### Version Selection
 
@@ -97,22 +93,11 @@ All POST endpoints that compile code accept version selection:
 | `errors` / `warnings` | Parsed compiler diagnostics with file, line, column, severity |
 | `insights` | Circuit metadata from compiler output (names, k-values, row counts) -- requires full ZK compilation |
 | `bindings` | TypeScript artifacts from compiler output -- requires `includeBindings: true` |
-| `cacheKey` | SHA-256 hash for retrieving this result via `GET /cached-response/:hash` |
-
-### Simulation
-
-The simulation endpoints provide a stateful contract interaction flow:
-
-1. **Deploy** (`POST /simulate/deploy`): Parse contract, create session with initial ledger state, return session ID
-2. **Call** (`POST /simulate/:id/call`): Execute a circuit, return state changes and updated ledger
-3. **State** (`GET /simulate/:id/state`): Inspect ledger, circuits, and call history
-4. **Delete** (`DELETE /simulate/:id`): End session and free resources
-
-Sessions expire after 15 minutes of inactivity. Maximum 100 concurrent sessions.
+| `cacheKey` | Opaque cache token for retrieving this result via `GET /cached-response/:hash` |
 
 ### Caching
 
-Responses from `/compile`, `/format`, `/diff`, `/analyze`, and `/prove` include a `cacheKey` field (SHA-256 hash). Any cached result can be retrieved later via `GET /cached-response/:hash` without re-running the operation.
+Responses from `/compile`, `/format`, `/diff`, `/analyze`, and `/prove` include a `cacheKey` field (opaque token). Any cached result can be retrieved later via `GET /cached-response/:hash` without re-running the operation.
 
 Cache is persisted to disk at `CACHE_DIR` with configurable size limits and TTL.
 
@@ -146,10 +131,6 @@ backend/src/
 │   ├── recommendations.ts # Recommendation generator
 │   ├── explanations.ts   # Circuit explanation generator
 │   └── proof-analysis.ts # ZK privacy boundary analysis engine
-├── simulator/
-│   ├── types.ts          # Simulation type definitions
-│   ├── engine.ts         # Static analysis-based state tracking engine
-│   └── session-manager.ts # TTL-based session manager with auto-cleanup
 └── routes/
     ├── compile.ts        # POST /compile
     ├── compile-archive.ts # POST /compile/archive
@@ -158,7 +139,6 @@ backend/src/
     ├── visualize.ts      # POST /visualize
     ├── prove.ts          # POST /prove
     ├── diff.ts           # POST /diff
-    ├── simulate.ts       # POST /simulate/deploy, /call, /state, DELETE
     ├── cached-response.ts # GET /cached-response/:hash
     └── health.ts         # GET /health, GET /versions, GET /libraries
 ```
@@ -186,7 +166,6 @@ backend/src/
 | `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
 | `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
 | `OZ_CONTRACTS_PATH` | `/opt/oz-compact/contracts/src` | Path to OpenZeppelin Compact contracts |
-| `OZ_SIMULATOR_PATH` | `/opt/oz-compact/packages/simulator` | Path to OZ simulator package |
 
 ## Rate Limiting and IP Extraction
 

@@ -6,6 +6,7 @@ import { getConfig } from "./config.js";
 import { getDefaultVersion, prepareVersionDir } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
 import type { FormatterError } from "./types.js";
+import { acquireExecutionSlot, releaseExecutionSlot } from "./execution-limiter.js";
 
 export interface FormatOptions {
   timeout?: number;
@@ -43,7 +44,7 @@ export async function formatCode(
   if (cache && cacheKey) {
     const cached = await cache.get<FormatResult>("format", cacheKey);
     if (cached) {
-      return { result: cached, cacheKey };
+      return { result: cached, cacheKey: cache.getPublicIdForKey(cacheKey) };
     }
   }
 
@@ -89,7 +90,8 @@ export async function formatCode(
       ? ["format", "--directory", versionDir, sourceFile]
       : ["format", sourceFile];
 
-    const result = await runFormatter(compactCli, formatArgs, options.timeout || 10000);
+    const timeout = Math.min(options.timeout ?? config.formatTimeout, config.formatTimeout);
+    const result = await runFormatter(compactCli, formatArgs, timeout);
 
     if (result.exitCode !== 0) {
       return {
@@ -116,10 +118,11 @@ export async function formatCode(
     }
 
     if (cache && cacheKey) {
-      await cache.set("format", cacheKey, formatResult);
+      const publicCacheKey = await cache.set("format", cacheKey, formatResult);
+      return { result: formatResult, cacheKey: publicCacheKey };
     }
 
-    return { result: formatResult, cacheKey: cacheKey ?? undefined };
+    return { result: formatResult, cacheKey: undefined };
   } finally {
     try {
       await rm(sessionDir, { recursive: true, force: true });
@@ -129,12 +132,22 @@ export async function formatCode(
   }
 }
 
-function runFormatter(
+async function runFormatter(
   path: string,
   args: string[],
   timeout: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  await acquireExecutionSlot();
+
   return new Promise((resolve, reject) => {
+    let slotReleased = false;
+    const releaseSlot = () => {
+      if (!slotReleased) {
+        slotReleased = true;
+        releaseExecutionSlot();
+      }
+    };
+
     const proc = spawn(path, args, {
       env: { ...process.env, TERM: "dumb" },
     });
@@ -158,6 +171,7 @@ function runFormatter(
     }, timeout);
 
     proc.on("close", (code) => {
+      releaseSlot();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {
@@ -167,6 +181,7 @@ function runFormatter(
     });
 
     proc.on("error", (error) => {
+      releaseSlot();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {

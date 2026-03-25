@@ -13,6 +13,7 @@ import { getConfig } from "./config.js";
 import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
 import { linkLibraries } from "./libraries.js";
+import { acquireExecutionSlot, releaseExecutionSlot } from "./execution-limiter.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -72,7 +73,7 @@ export async function compile(
     if (cache && cacheKey) {
       const cached = await cache.get<CompileResult>("compile", cacheKey);
       if (cached) {
-        return { result: cached, cacheKey };
+        return { result: cached, cacheKey: cache.getPublicIdForKey(cacheKey) };
       }
     }
 
@@ -121,7 +122,8 @@ export async function compile(
 
     compileArgs.push(sourceFile, outputDir);
 
-    const result = await runCompiler(compileArgs, options.timeout || config.compileTimeout);
+    const timeout = Math.min(options.timeout ?? config.compileTimeout, config.compileTimeout);
+    const result = await runCompiler(compileArgs, timeout);
 
     const executionTime = Date.now() - startTime;
 
@@ -155,10 +157,11 @@ export async function compile(
       };
 
       if (cache && cacheKey) {
-        await cache.set("compile", cacheKey, compileResult);
+        const publicCacheKey = await cache.set("compile", cacheKey, compileResult);
+        return { result: compileResult, cacheKey: publicCacheKey };
       }
 
-      return { result: compileResult, cacheKey: cacheKey ?? undefined };
+      return { result: compileResult, cacheKey: undefined };
     } else {
       // Compilation failed
       const errors = parseCompilerErrors(result.stderr || result.stdout);
@@ -233,8 +236,17 @@ interface CompilerOutput {
  * Runs the compact compiler with the given arguments
  */
 export async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
+  await acquireExecutionSlot();
+
   return new Promise((resolve, reject) => {
     const compactCli = getConfig().compactCliPath;
+    let slotReleased = false;
+    const releaseSlot = () => {
+      if (!slotReleased) {
+        slotReleased = true;
+        releaseExecutionSlot();
+      }
+    };
 
     const proc = spawn(compactCli, args, {
       env: {
@@ -268,6 +280,7 @@ export async function runCompiler(args: string[], timeout: number): Promise<Comp
     }, timeout);
 
     proc.on("close", (code) => {
+      releaseSlot();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {
@@ -281,6 +294,7 @@ export async function runCompiler(args: string[], timeout: number): Promise<Comp
     });
 
     proc.on("error", (error) => {
+      releaseSlot();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {

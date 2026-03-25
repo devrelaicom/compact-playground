@@ -569,113 +569,12 @@ pause
 send_request "$CMD"
 pause
 
-# ─── 25. Simulate — Deploy Contract ─────────────────────────────────────────
+# ─── 25. Cached Response ────────────────────────────────────────────────────
 
-banner "25. Simulate — Deploy Contract"
+banner "25. Cached Response Lookup"
 
-describe "POST /simulate/deploy compiles a contract using the Compact compiler, extracts
-TypeScript bindings, and instantiates a real OZ Compact Simulator for interactive
-execution. Returns a sessionId for subsequent calls. Sessions expire after 15 minutes
-of inactivity. Max 100 concurrent sessions.
-
-Note: Deploy is slower than other endpoints (~1-5s) because it performs a full
-compilation with bindings extraction before creating the simulator instance."
-
-CODE=$(json_escape counter.compact)
-CMD="curl -s $API/simulate/deploy -H 'Content-Type: application/json' -d '{\"code\": $CODE}'"
-
-show_request "POST /simulate/deploy  (counter.compact)"
-pause
-
-# Capture the response to extract sessionId
-DEPLOY_RESPONSE=$(eval "$CMD" 2>&1) || true
-echo -e "${BOLD}Response:${RESET}"
-echo "$DEPLOY_RESPONSE" | jq . 2>/dev/null || echo "$DEPLOY_RESPONSE"
-echo ""
-
-# Extract sessionId for subsequent calls
-SESSION_ID=$(echo "$DEPLOY_RESPONSE" | jq -r '.sessionId // empty' 2>/dev/null) || true
-
-if [ -z "$SESSION_ID" ]; then
-  echo -e "${RED}Failed to get sessionId — skipping remaining simulation demos${RESET}"
-  pause
-else
-  echo -e "${DIM}Captured sessionId: $SESSION_ID${RESET}"
-  echo ""
-  pause
-
-  # ─── 26. Simulate — Call Circuit ─────────────────────────────────────────
-
-  banner "26. Simulate — Call Circuit"
-
-  describe "POST /simulate/:sessionId/call executes a circuit on the deployed contract
-using the OZ Compact Simulator — real compiled logic, not heuristic simulation.
-Returns actual state changes, updated ledger state, and call history.
-Let's call 'increment' twice to see the counter change."
-
-  CMD="curl -s $API/simulate/$SESSION_ID/call -H 'Content-Type: application/json' -d '{\"circuit\": \"increment\"}'"
-
-  show_request "POST /simulate/$SESSION_ID/call  (circuit: increment — first call)"
-  pause
-  send_request "$CMD"
-
-  section "Second increment call"
-
-  show_request "POST /simulate/$SESSION_ID/call  (circuit: increment — second call)"
-  pause
-  send_request "$CMD"
-  pause
-
-  # ─── 27. Simulate — Call with Caller Context ──────────────────────────
-
-  banner "27. Simulate — Call with Caller Context"
-
-  describe "The optional 'caller' parameter sets the transaction sender identity for
-a single call. This is injected into the OZ simulator so circuits that check the
-caller (e.g., access control) see the correct address. The caller resets after each call."
-
-  CMD="curl -s $API/simulate/$SESSION_ID/call -H 'Content-Type: application/json' -d '{\"circuit\": \"increment\", \"caller\": \"0100000000000000000000000000000000000000000000000000000000000000\"}'"
-
-  show_request "POST /simulate/$SESSION_ID/call  (circuit: increment, with caller context)"
-  pause
-  send_request "$CMD"
-  pause
-
-  # ─── 28. Simulate — Get State ───────────────────────────────────────────
-
-  banner "28. Simulate — Session State"
-
-  describe "GET /simulate/:sessionId/state returns the current session state including
-ledger values, available circuits, call history, and session expiration time."
-
-  CMD="curl -s $API/simulate/$SESSION_ID/state"
-
-  show_request "GET /simulate/$SESSION_ID/state"
-  pause
-  send_request "$CMD"
-  pause
-
-  # ─── 29. Simulate — Delete Session ──────────────────────────────────────
-
-  banner "29. Simulate — Delete Session"
-
-  describe "DELETE /simulate/:sessionId ends the simulation session and frees resources."
-
-  CMD="curl -s -X DELETE $API/simulate/$SESSION_ID"
-
-  show_request "DELETE /simulate/$SESSION_ID"
-  pause
-  send_request "$CMD"
-  pause
-
-fi  # end SESSION_ID check
-
-# ─── 30. Cached Response ────────────────────────────────────────────────────
-
-banner "30. Cached Response Lookup"
-
-describe "Most endpoints include a 'cacheKey' field in their response — a SHA-256
-hash of the request. You can retrieve any cached result later via
+describe "Most endpoints include a 'cacheKey' field in their response — an opaque
+cache token. You can retrieve any cached result later via
 GET /cached-response/:hash without re-running the operation.
 
 Let's compile a contract and then look up the result by its cacheKey."
@@ -707,9 +606,9 @@ else
   pause
 fi
 
-# ─── 31. Root ────────────────────────────────────────────────────────────────
+# ─── 26. Root ────────────────────────────────────────────────────────────────
 
-banner "31. API Index"
+banner "26. API Index"
 
 describe "The root endpoint lists all available endpoints."
 
@@ -733,11 +632,7 @@ echo "  POST /analyze                 - 5-stage analysis pipeline (fast / deep)"
 echo "  POST /visualize               - Contract architecture graph (DAG + Mermaid)"
 echo "  POST /prove                   - ZK privacy boundary analysis"
 echo "  POST /diff                    - Semantic contract diff"
-echo "  POST /simulate/deploy         - Compile + deploy contract via OZ simulator"
-echo "  POST /simulate/:id/call       - Execute circuit with real compiled logic"
-echo "  GET  /simulate/:id/state      - Get simulation session state"
-echo "  DELETE /simulate/:id          - End simulation session"
-echo "  GET  /cached-response/:hash   - Retrieve cached result by hash"
+echo "  GET  /cached-response/:hash   - Retrieve cached result by opaque token"
 echo "  GET  /                        - API index"
 echo ""
 echo "Compile features:"
@@ -750,10 +645,6 @@ echo "  mode: fast      - Source-level analysis (no compilation)"
 echo "  mode: deep      - Analysis + compilation diagnostics"
 echo "  include: [...]  - Filter response sections (findings, recommendations, etc.)"
 echo "  circuit: name   - Focus analysis on a single circuit"
-echo ""
-echo "Simulate features:"
-echo "  caller: \"0x...\"  - Set transaction sender identity for access control"
-echo "  Real circuit execution via OZ Compact Simulator (not heuristic)"
 echo ""
 echo "Special version values:"
 echo "  \"detect\" - Auto-select compiler based on pragma in source code"

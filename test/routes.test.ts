@@ -42,6 +42,7 @@ vi.mock("../backend/src/config.js", () => ({
   getConfig: vi.fn(() => ({
     defaultCompilerVersion: "latest",
     cacheEnabled: false,
+    ozContractsPath: "/opt/oz-compact/contracts/src",
   })),
   resetConfig: vi.fn(),
 }));
@@ -584,7 +585,11 @@ describe("GET /health", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockGetConfig.mockReturnValue({ defaultCompilerVersion: "latest" });
+    mockGetConfig.mockReturnValue({
+      defaultCompilerVersion: "latest",
+      cacheEnabled: false,
+      ozContractsPath: "/opt/oz-compact/contracts/src",
+    });
     app = createApp();
   });
 
@@ -699,7 +704,7 @@ describe("POST /visualize", () => {
 
 describe("GET /cached-response/:hash", () => {
   let app: Hono;
-  const validHash = "a".repeat(64); // valid SHA-256 hex
+  const validCacheToken = "123e4567-e89b-42d3-a456-426614174000";
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -710,26 +715,26 @@ describe("GET /cached-response/:hash", () => {
 
   it("returns cached data when hash exists", async () => {
     const mockCache = {
-      getByKey: vi.fn().mockResolvedValue({ success: true, output: "cached result" }),
+      getByPublicId: vi.fn().mockResolvedValue({ success: true, output: "cached result" }),
     };
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
 
-    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+    const res = await app.request(`/cached-response/${validCacheToken}`, { method: "GET" });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.success).toBe(true);
     expect(body.output).toBe("cached result");
-    expect(mockCache.getByKey).toHaveBeenCalledWith(validHash);
+    expect(mockCache.getByPublicId).toHaveBeenCalledWith(validCacheToken);
   });
 
   it("returns 404 when hash not found", async () => {
     const mockCache = {
-      getByKey: vi.fn().mockResolvedValue(undefined),
+      getByPublicId: vi.fn().mockResolvedValue(undefined),
     };
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
 
-    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+    const res = await app.request(`/cached-response/${validCacheToken}`, { method: "GET" });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
@@ -740,7 +745,7 @@ describe("GET /cached-response/:hash", () => {
   it("returns 404 when caching is disabled", async () => {
     (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+    const res = await app.request(`/cached-response/${validCacheToken}`, { method: "GET" });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
@@ -758,7 +763,7 @@ describe("GET /cached-response/:hash", () => {
   it("rate limited → 429", async () => {
     mockCheckRateLimit.mockReturnValue(false);
 
-    const res = await app.request(`/cached-response/${validHash}`, { method: "GET" });
+    const res = await app.request(`/cached-response/${validCacheToken}`, { method: "GET" });
 
     expect(res.status).toBe(429);
   });

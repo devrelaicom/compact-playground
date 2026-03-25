@@ -70,7 +70,7 @@ export async function compileArchive(
     if (cache && cacheKey) {
       const cached = await cache.get<CompileResult>("compile-archive", cacheKey);
       if (cached) {
-        return { result: cached, cacheKey };
+        return { result: cached, cacheKey: cache.getPublicIdForKey(cacheKey) };
       }
     }
 
@@ -105,10 +105,11 @@ export async function compileArchive(
       };
 
       if (cache && cacheKey) {
-        await cache.set("compile-archive", cacheKey, compileResult);
+        const publicCacheKey = await cache.set("compile-archive", cacheKey, compileResult);
+        return { result: compileResult, cacheKey: publicCacheKey };
       }
 
-      return { result: compileResult, cacheKey: cacheKey ?? undefined };
+      return { result: compileResult, cacheKey: undefined };
     } else {
       const errors = parseCompilerErrors(result.stderr || result.stdout);
 

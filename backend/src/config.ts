@@ -1,9 +1,13 @@
+import { randomBytes } from "node:crypto";
+
 export interface Config {
   port: number;
   defaultCompilerVersion: string;
   tempDir: string;
   compactCliPath: string;
   compileTimeout: number;
+  formatTimeout: number;
+  maxConcurrentExecutions: number;
   rateLimit: number;
   rateWindow: number;
   cacheEnabled: boolean;
@@ -12,6 +16,7 @@ export interface Config {
   cacheMaxEntries: number;
   cacheTtl: number;
   cacheKeySalt: string;
+  usingEphemeralCacheSalt: boolean;
   maxVersionsPerRequest: number;
   maxCodeSize: number;
   maxJsonBodySize: number;
@@ -20,13 +25,18 @@ export interface Config {
   trustCloudflare: boolean;
   trustProxy: boolean;
   ozContractsPath: string;
-  ozSimulatorPath: string;
 }
 
 let _config: Config | null = null;
+let _ephemeralCacheSalt: string | null = null;
 
 export function getConfig(): Config {
   if (_config) return _config;
+
+  const usingEphemeralCacheSalt = !process.env.CACHE_KEY_SALT;
+  if (usingEphemeralCacheSalt && !_ephemeralCacheSalt) {
+    _ephemeralCacheSalt = randomBytes(32).toString("hex");
+  }
 
   _config = {
     port: parseInt(process.env.PORT || "8080", 10),
@@ -34,6 +44,8 @@ export function getConfig(): Config {
     tempDir: process.env.TEMP_DIR || "/tmp/compact-playground",
     compactCliPath: process.env.COMPACT_CLI_PATH || "compact",
     compileTimeout: parseInt(process.env.COMPILE_TIMEOUT || "30000", 10),
+    formatTimeout: parseInt(process.env.FORMAT_TIMEOUT || "10000", 10),
+    maxConcurrentExecutions: parseInt(process.env.MAX_CONCURRENT_EXECUTIONS || "3", 10),
     rateLimit: parseInt(process.env.RATE_LIMIT || "20", 10),
     rateWindow: parseInt(process.env.RATE_WINDOW || "60000", 10),
     cacheEnabled: process.env.CACHE_ENABLED !== "false",
@@ -41,7 +53,8 @@ export function getConfig(): Config {
     cacheMaxDiskMb: parseInt(process.env.CACHE_MAX_DISK_MB || "800", 10),
     cacheMaxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || "50000", 10),
     cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
-    cacheKeySalt: process.env.CACHE_KEY_SALT || "",
+    cacheKeySalt: process.env.CACHE_KEY_SALT || _ephemeralCacheSalt || "",
+    usingEphemeralCacheSalt,
     maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "3", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
     maxJsonBodySize: parseInt(process.env.MAX_JSON_BODY_SIZE || String(512 * 1024), 10),
@@ -50,7 +63,6 @@ export function getConfig(): Config {
     trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",
     trustProxy: process.env.TRUST_PROXY === "true",
     ozContractsPath: process.env.OZ_CONTRACTS_PATH || "/opt/oz-compact/contracts/src",
-    ozSimulatorPath: process.env.OZ_SIMULATOR_PATH || "/opt/oz-compact/packages/simulator",
   };
 
   return _config;
@@ -59,4 +71,5 @@ export function getConfig(): Config {
 /** Reset config singleton (for testing only) */
 export function resetConfig(): void {
   _config = null;
+  _ephemeralCacheSalt = null;
 }

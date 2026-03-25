@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { mkdir, readFile, writeFile, rename, unlink, readdir, stat } from "fs/promises";
 import { join, dirname } from "path";
 import { getConfig } from "./config.js";
@@ -39,10 +39,12 @@ interface IndexEntry {
   endpoint: string;
   atime: number;
   size: number;
+  publicId: string;
 }
 
 interface CacheEnvelope<T> {
   createdAt: number;
+  publicId: string;
   data: T;
 }
 
@@ -52,6 +54,7 @@ export class FileCache {
   private maxDiskMb: number;
   private maxEntries: number;
   private index = new Map<string, IndexEntry>();
+  private publicIndex = new Map<string, { endpoint: string; key: string }>();
   private _hits = 0;
   private _misses = 0;
 
@@ -64,7 +67,15 @@ export class FileCache {
 
   /** Rebuild index from disk, delete expired entries */
   async init(): Promise<void> {
-    const endpoints = ["compile", "format", "analyze", "diff", "compile-archive", "visualize"];
+    const endpoints = [
+      "compile",
+      "format",
+      "analyze",
+      "diff",
+      "compile-archive",
+      "visualize",
+      "prove",
+    ];
 
     for (const endpoint of endpoints) {
       const endpointDir = join(this.baseDir, endpoint);
@@ -114,7 +125,10 @@ export class FileCache {
 
         try {
           const content = await readFile(filePath, "utf-8");
-          const envelope = JSON.parse(content) as CacheEnvelope<unknown>;
+          const envelope = JSON.parse(content) as Partial<CacheEnvelope<unknown>>;
+          if (typeof envelope.createdAt !== "number") {
+            throw new Error("Cache entry missing createdAt");
+          }
 
           if (Date.now() - envelope.createdAt > this.ttl) {
             // Expired — delete
@@ -123,11 +137,17 @@ export class FileCache {
           }
 
           const fileStat = await stat(filePath);
+          const publicId =
+            envelope.publicId && isValidPublicCacheId(envelope.publicId)
+              ? envelope.publicId
+              : randomUUID();
           this.index.set(key, {
             endpoint,
             atime: Date.now(),
             size: fileStat.size,
+            publicId,
           });
+          this.publicIndex.set(publicId, { endpoint, key });
         } catch {
           // Corrupted file — delete it
           await unlink(filePath).catch(() => {});
@@ -156,6 +176,7 @@ export class FileCache {
       if (Date.now() - envelope.createdAt > this.ttl) {
         // Expired — lazy delete
         this.index.delete(key);
+        this.publicIndex.delete(entry.publicId);
         await unlink(path).catch(() => {});
         this._misses++;
         return undefined;
@@ -168,6 +189,7 @@ export class FileCache {
     } catch {
       // File missing or corrupted — remove from index
       this.index.delete(key);
+      this.publicIndex.delete(entry.publicId);
       this._misses++;
       return undefined;
     }
@@ -183,10 +205,26 @@ export class FileCache {
     return this.get<T>(entry.endpoint, key);
   }
 
-  async set(endpoint: string, key: string, data: unknown): Promise<void> {
+  async getByPublicId<T>(publicId: string): Promise<T | undefined> {
+    const indexed = this.publicIndex.get(publicId);
+    if (!indexed) {
+      this._misses++;
+      return undefined;
+    }
+
+    return this.get<T>(indexed.endpoint, indexed.key);
+  }
+
+  getPublicIdForKey(key: string): string | undefined {
+    return this.index.get(key)?.publicId;
+  }
+
+  async set(endpoint: string, key: string, data: unknown): Promise<string> {
     const path = this.filePath(endpoint, key);
+    const publicId = this.index.get(key)?.publicId ?? randomUUID();
     const envelope: CacheEnvelope<unknown> = {
       createdAt: Date.now(),
+      publicId,
       data,
     };
 
@@ -201,15 +239,19 @@ export class FileCache {
         endpoint,
         atime: Date.now(),
         size: content.length,
+        publicId,
       });
+      this.publicIndex.set(publicId, { endpoint, key });
 
       // Async purge if over entry limit
-      if (this.index.size > this.maxEntries) {
+      if (this.index.size > this.maxEntries + 1000) {
         this.purge().catch(() => {});
       }
     } catch (err) {
       log.warn("FileCache write error: {error}", { error: String(err) });
     }
+
+    return publicId;
   }
 
   /** Delete expired entries, then evict LRU if over disk or entry limits */
@@ -224,6 +266,7 @@ export class FileCache {
         const path = this.filePath(entry.endpoint, key);
         await unlink(path).catch(() => {});
         this.index.delete(key);
+        this.publicIndex.delete(entry.publicId);
         deleted++;
       }
     }
@@ -240,6 +283,7 @@ export class FileCache {
         await unlink(path).catch(() => {});
         currentBytes -= entry.size;
         this.index.delete(key);
+        this.publicIndex.delete(entry.publicId);
         deleted++;
       }
     }
@@ -279,4 +323,8 @@ export function getFileCache(): FileCache | null {
 /** Reset file cache singleton (for testing) */
 export function resetFileCache(): void {
   _fileCache = null;
+}
+
+function isValidPublicCacheId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

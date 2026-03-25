@@ -7,7 +7,7 @@ export const compileBodySchema = z.object({
       wrapWithDefaults: z.boolean().optional(),
       languageVersion: z.string().optional(),
       skipZk: z.boolean().optional(),
-      timeout: z.number().positive().optional(),
+      timeout: z.number().int().positive().max(30_000).optional(),
       version: z.string().optional(),
       includeBindings: z.boolean().optional(),
       libraries: z.array(z.string().max(100)).max(20).optional(),
@@ -21,7 +21,7 @@ export const formatBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
   options: z
     .object({
-      timeout: z.number().positive().optional(),
+      timeout: z.number().int().positive().max(10_000).optional(),
       version: z.string().optional(),
     })
     .optional()

@@ -52,7 +52,7 @@ export async function diffContracts(
   if (cache && cacheKey) {
     const cached = await cache.get<DiffResult>("diff", cacheKey);
     if (cached) {
-      return { result: cached, cacheKey };
+      return { result: cached, cacheKey: cache.getPublicIdForKey(cacheKey) };
     }
   }
 
@@ -137,8 +137,9 @@ export async function diffContracts(
   };
 
   if (cache && cacheKey) {
-    await cache.set("diff", cacheKey, result);
+    const publicCacheKey = await cache.set("diff", cacheKey, result);
+    return { result, cacheKey: publicCacheKey };
   }
 
-  return { result, cacheKey: cacheKey ?? undefined };
+  return { result, cacheKey: undefined };
 }

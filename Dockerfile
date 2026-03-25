@@ -26,27 +26,6 @@ RUN git init /opt/oz-compact \
     && git checkout FETCH_HEAD \
     && rm -rf .git .github
 
-# OZ Simulator build stage — install deps and compile TypeScript
-# The OZ repo uses Yarn 4 workspaces (not npm), so we enable corepack.
-FROM node:24-slim AS oz-builder
-COPY --from=oz-clone /opt/oz-compact /opt/oz-compact
-WORKDIR /opt/oz-compact
-# Enable corepack so the repo's packageManager field activates Yarn 4
-RUN corepack enable && corepack prepare
-# Install all workspace dependencies (including devDeps needed for build)
-RUN yarn install
-# Upgrade compact-runtime to match what the latest compiler (0.30.0) emits.
-# The OZ repo pins 0.14.0 but compiler 0.30.0 generates bindings expecting 0.15.0.
-RUN yarn up @midnight-ntwrk/compact-runtime@0.15.0
-# Build the simulator package (tsc -p .)
-WORKDIR /opt/oz-compact/packages/simulator
-RUN yarn build
-# Remove build tooling and test files to keep the production image lean.
-# We keep node_modules (has compact-runtime) and dist/ (built simulator).
-WORKDIR /opt/oz-compact
-RUN rm -rf .yarn/cache packages/simulator/src packages/simulator/test \
-    && find . -name "*.tsbuildinfo" -delete
-
 # Production stage
 FROM node:24-slim AS production
 
@@ -99,18 +78,17 @@ RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
 # Verify installation
 RUN compact --version && compact list --installed
 
-# ── OpenZeppelin Compact Dependencies ──────────────────────────────────
-# Copied from oz-builder stage (built simulator + pruned deps)
-COPY --from=oz-builder /opt/oz-compact /opt/oz-compact
+# ── OpenZeppelin Compact Contracts ─────────────────────────────────────
+COPY --from=oz-clone /opt/oz-compact/contracts /opt/oz-compact/contracts
 
 # Set up OZ environment variables
 ENV OZ_CONTRACTS_PATH=/opt/oz-compact/contracts/src
-ENV OZ_SIMULATOR_PATH=/opt/oz-compact/packages/simulator
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
+RUN npm prune --omit=dev
 
 # Create non-root user and writable directories
 RUN groupadd --system appgroup \

@@ -62,21 +62,35 @@ describe("config", () => {
 
   it("returns default OZ paths when no env vars set", () => {
     delete process.env.OZ_CONTRACTS_PATH;
-    delete process.env.OZ_SIMULATOR_PATH;
 
     const config = getConfig();
 
     expect(config.ozContractsPath).toBe("/opt/oz-compact/contracts/src");
-    expect(config.ozSimulatorPath).toBe("/opt/oz-compact/packages/simulator");
   });
 
-  it("reads OZ paths from environment variables", () => {
+  it("reads OZ contracts path from environment variables", () => {
     process.env.OZ_CONTRACTS_PATH = "/custom/oz/contracts";
-    process.env.OZ_SIMULATOR_PATH = "/custom/oz/simulator";
 
     const config = getConfig();
 
     expect(config.ozContractsPath).toBe("/custom/oz/contracts");
-    expect(config.ozSimulatorPath).toBe("/custom/oz/simulator");
+  });
+
+  it("generates an ephemeral cache salt when CACHE_KEY_SALT is unset", () => {
+    delete process.env.CACHE_KEY_SALT;
+
+    const config = getConfig();
+
+    expect(config.usingEphemeralCacheSalt).toBe(true);
+    expect(config.cacheKeySalt).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("uses configured cache salt when provided", () => {
+    process.env.CACHE_KEY_SALT = "fixed-salt";
+
+    const config = getConfig();
+
+    expect(config.usingEphemeralCacheSalt).toBe(false);
+    expect(config.cacheKeySalt).toBe("fixed-salt");
   });
 });

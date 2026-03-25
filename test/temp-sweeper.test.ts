@@ -55,15 +55,6 @@ describe("sweepStaleTempDirs", () => {
     expect(existsSync(oldDir)).toBe(false);
   });
 
-  it("removes old sim- dirs (simulator pattern)", async () => {
-    const oldDir = createDir("sim-a1b2c3d4-e5f6-7890-abcd-ef1234567890", 2 * 60 * 60 * 1000);
-
-    const result = await sweepStaleTempDirs(60 * 60 * 1000);
-
-    expect(result.swept).toBe(1);
-    expect(existsSync(oldDir)).toBe(false);
-  });
-
   it("does NOT remove recent session dirs", async () => {
     const recentDir = createDir("a1b2c3d4-e5f6-7890-abcd-ef1234567890"); // just created
 
@@ -114,12 +105,11 @@ describe("sweepStaleTempDirs", () => {
   it("sweeps multiple old dirs in a single pass", async () => {
     createDir("a1b2c3d4-e5f6-7890-abcd-ef1234567890", 2 * 60 * 60 * 1000);
     createDir("fmt-b2c3d4e5-f6a7-8901-bcde-f12345678901", 2 * 60 * 60 * 1000);
-    createDir("sim-c3d4e5f6-a7b8-9012-cdef-123456789012", 2 * 60 * 60 * 1000);
     createDir("compact-versions", 2 * 60 * 60 * 1000); // should NOT be swept
 
     const result = await sweepStaleTempDirs(60 * 60 * 1000);
 
-    expect(result.swept).toBe(3);
+    expect(result.swept).toBe(2);
     expect(result.errors).toBe(0);
   });
 });

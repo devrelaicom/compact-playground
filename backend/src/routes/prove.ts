@@ -35,6 +35,8 @@ proveRoutes.post("/prove", async (c) => {
 
     let result: ReturnType<typeof buildProofAnalysis>;
 
+    let publicCacheKey = cache && cacheKey ? cache.getPublicIdForKey(cacheKey) : undefined;
+
     if (cached) {
       result = cached;
     } else {
@@ -43,7 +45,7 @@ proveRoutes.post("/prove", async (c) => {
       result = buildProofAnalysis(model);
 
       if (cache && cacheKey) {
-        await cache.set("prove", cacheKey, result);
+        publicCacheKey = await cache.set("prove", cacheKey, result);
       }
     }
 
@@ -55,7 +57,7 @@ proveRoutes.post("/prove", async (c) => {
       };
     }
 
-    return c.json({ ...result, cacheKey: cacheKey ?? undefined });
+    return c.json({ ...result, cacheKey: publicCacheKey });
   } catch (error) {
     routeLog.error("Prove analysis error: {error}", {
       error: safeErrorMessage(error),
@@ -66,7 +68,7 @@ proveRoutes.post("/prove", async (c) => {
         success: false,
         errors: [
           {
-            message: error instanceof Error ? error.message : "An unknown error occurred",
+            message: "An unexpected error occurred during processing",
             severity: "error" as const,
           },
         ],

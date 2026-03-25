@@ -330,7 +330,6 @@ All settings are controlled via environment variables:
 | `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
 | `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
 | `OZ_CONTRACTS_PATH` | `/opt/oz-compact/contracts/src` | Path to OpenZeppelin Compact contracts |
-| `OZ_SIMULATOR_PATH` | `/opt/oz-compact/packages/simulator` | Path to OZ simulator package |
 
 > **Learn Compact:** Set `DEFAULT_COMPILER_VERSION=0.26.0` to pin the compiler to match `pragma language_version >= 0.16 && <= 0.18` used in the tutorial contracts.
 

@@ -9,7 +9,6 @@ const DEFAULT_MAX_AGE_MS = 60 * 60 * 1000;
 const SESSION_DIR_PATTERNS = [
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, // UUID (compiler, archive)
   /^fmt-/, // formatter
-  /^sim-/, // simulator
 ];
 
 function isSessionDir(name: string): boolean {
@@ -23,7 +22,7 @@ export interface SweepResult {
 
 /**
  * Scans TEMP_DIR for session directories older than maxAgeMs and removes them.
- * Only targets directories matching known session prefixes (UUID, fmt-, sim-).
+ * Only targets directories matching known session prefixes (UUID, fmt-).
  * Skips non-session directories like compact-versions.
  */
 export async function sweepStaleTempDirs(

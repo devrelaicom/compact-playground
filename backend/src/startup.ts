@@ -33,13 +33,5 @@ export async function validateStartup(): Promise<StartupCheckResult> {
     );
   }
 
-  // Check OZ simulator path
-  if (!existsSync(config.ozSimulatorPath)) {
-    errors.push(
-      `OpenZeppelin simulator not found at "${config.ozSimulatorPath}". ` +
-        "Set OZ_SIMULATOR_PATH to the correct location.",
-    );
-  }
-
   return { ok: errors.length === 0, errors };
 }

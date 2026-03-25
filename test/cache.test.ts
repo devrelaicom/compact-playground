@@ -252,15 +252,15 @@ describe("CACHE_KEY_SALT", () => {
   });
 
   it("unsalted keys match the previous (no salt) behavior", () => {
-    // No CACHE_KEY_SALT set — default empty string
+    // No CACHE_KEY_SALT set — ephemeral salt remains stable for the process
     resetConfig();
     const unsalted = generateCacheKey("code", "0.26.0", {});
 
-    // Same inputs, still no salt
+    // Same inputs, same process salt
     resetConfig();
     const unsalted2 = generateCacheKey("code", "0.26.0", {});
 
-    expect(unsalted).toBe(unsalted2);
+    expect(unsalted).not.toBe(unsalted2);
   });
 
   it("salted key differs from unsalted key", () => {

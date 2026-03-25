@@ -124,7 +124,7 @@ archiveCompileRoutes.post(
         {
           success: false,
           error: "Internal server error",
-          message: error instanceof Error ? error.message : "An unknown error occurred",
+          message: "An unexpected error occurred during processing",
         },
         500,
       );

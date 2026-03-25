@@ -130,10 +130,6 @@ describe("createJsonBodyLimit", () => {
       await c.req.json();
       return c.json({ success: true });
     });
-    app.post("/simulate/deploy", async (c) => {
-      await c.req.json();
-      return c.json({ success: true });
-    });
     app.post("/compile/archive", (c) => {
       // Archive endpoint should bypass JSON body limit
       return c.json({ success: true });
@@ -160,20 +156,6 @@ describe("createJsonBodyLimit", () => {
     const app = createApp();
     const oversizedBody = JSON.stringify({ code: "x".repeat(600 * 1024) });
     const res = await app.request("/prove", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: oversizedBody,
-    });
-    expect(res.status).toBe(413);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.success).toBe(false);
-    expect(body.error).toBe("Payload too large");
-  });
-
-  it("rejects oversized JSON body on /simulate/deploy with 413", async () => {
-    const app = createApp();
-    const oversizedBody = JSON.stringify({ code: "x".repeat(600 * 1024) });
-    const res = await app.request("/simulate/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: oversizedBody,

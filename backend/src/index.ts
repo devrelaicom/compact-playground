@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -12,7 +13,6 @@ import { analyzeRoutes } from "./routes/analyze.js";
 import { diffRoutes } from "./routes/diff.js";
 import { visualizeRoutes } from "./routes/visualize.js";
 import { cachedResponseRoutes } from "./routes/cached-response.js";
-import { simulateRoutes } from "./routes/simulate.js";
 import { proveRoutes } from "./routes/prove.js";
 import { createJsonBodyLimit, validateRequestBody } from "./middleware.js";
 import { validateStartup } from "./startup.js";
@@ -21,9 +21,15 @@ import { isShuttingDown, registerShutdownHandlers } from "./shutdown.js";
 import { healthRoutes, warmVersionsCache } from "./routes/health.js";
 import { getFileCache } from "./cache.js";
 
-const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8")) as {
-  version: string;
-};
+let pkgVersion = "unknown";
+try {
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8")) as {
+    version?: string;
+  };
+  pkgVersion = pkg.version || pkgVersion;
+} catch {
+  // Fall back to "unknown" if package.json is unavailable at runtime.
+}
 
 const app = new Hono();
 
@@ -39,6 +45,13 @@ app.use(
     allowHeaders: ["Content-Type"],
   }),
 );
+
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Cache-Control", "no-store");
+});
 
 // Reject new requests during shutdown (before any body parsing)
 app.use("*", async (c, next) => {
@@ -59,7 +72,6 @@ app.route("/", analyzeRoutes);
 app.route("/", diffRoutes);
 app.route("/", visualizeRoutes);
 app.route("/", cachedResponseRoutes);
-app.route("/", simulateRoutes);
 app.route("/", proveRoutes);
 
 app.route("/", healthRoutes);
@@ -68,7 +80,7 @@ app.route("/", healthRoutes);
 app.get("/", (c) => {
   return c.json({
     name: "Compact Playground API",
-    version: pkg.version,
+    version: pkgVersion,
     description: "Compile, format, analyze, and diff Compact smart contracts",
     endpoints: {
       "POST /compile": 'Compile Compact code (versions: ["latest", "detect", or specific])',
@@ -80,11 +92,7 @@ app.get("/", (c) => {
       "POST /visualize": "Generate visual graph of contract architecture",
       "GET /versions": "List installed compiler versions with language version mapping",
       "GET /health": "Check service health",
-      "GET /cached-response/:hash": "Retrieve a cached response by its hash key",
-      "POST /simulate/deploy": "Deploy a contract for simulation",
-      "POST /simulate/:sessionId/call": "Call a circuit on a deployed contract",
-      "GET /simulate/:sessionId/state": "Get current session state",
-      "DELETE /simulate/:sessionId": "End a simulation session",
+      "GET /cached-response/:hash": "Retrieve a cached response by its opaque cache token",
       "POST /prove": "Visualize ZK privacy boundaries and proof flow for a contract",
     },
   });
@@ -128,11 +136,20 @@ setInterval(() => {
     });
 }, SWEEP_INTERVAL_MS).unref();
 
-if (!getConfig().cacheKeySalt) {
+const config = getConfig();
+if (config.usingEphemeralCacheSalt) {
   startupLog.warn(
-    "CACHE_KEY_SALT is not set. Cache keys are deterministic and " +
-      "cached responses may be retrievable by anyone who can reconstruct inputs.",
+    "CACHE_KEY_SALT is not set. Using an ephemeral cache salt for this process and " +
+      "clearing persisted cache on startup. Cache lookups will not survive restart.",
   );
+
+  try {
+    await rm(config.cacheDir, { recursive: true, force: true });
+  } catch (err: unknown) {
+    startupLog.warn("Failed to clear cache directory for ephemeral salt: {error}", {
+      error: String(err),
+    });
+  }
 }
 
 // Initialize file cache and warm versions cache at startup

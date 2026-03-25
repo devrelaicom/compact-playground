@@ -17,10 +17,11 @@ cachedResponseRoutes.get("/cached-response/:hash", async (c) => {
     );
   }
 
-  const hash = c.req.param("hash");
+  const publicId = c.req.param("hash");
 
-  // SHA-256 hex is always exactly 64 lowercase hex characters
-  if (!/^[0-9a-f]{64}$/.test(hash)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(publicId)
+  ) {
     return c.json(
       {
         success: false,
@@ -43,7 +44,7 @@ cachedResponseRoutes.get("/cached-response/:hash", async (c) => {
   }
 
   try {
-    const data = await cache.getByKey(hash);
+    const data = await cache.getByPublicId(publicId);
 
     if (!data) {
       return c.json(

@@ -25,8 +25,3 @@ export type VisualizationError = ExecutableError;
 
 /** Error from contract analysis. */
 export type AnalysisError = ExecutableError;
-
-/** Error from contract simulation. */
-export interface SimulationError extends ExecutableError {
-  errorCode?: "CAPACITY_EXCEEDED" | "SESSION_NOT_FOUND" | "CIRCUIT_NOT_FOUND";
-}

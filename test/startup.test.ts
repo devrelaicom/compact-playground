@@ -8,7 +8,6 @@ vi.mock("../backend/src/config.js", () => ({
   getConfig: vi.fn(() => ({
     compactCliPath: "compact",
     ozContractsPath: "/opt/oz-compact/contracts/src",
-    ozSimulatorPath: "/opt/oz-compact/packages/simulator",
   })),
   resetConfig: vi.fn(),
 }));
@@ -64,19 +63,6 @@ describe("validateStartup", () => {
     expect(result.errors.some((e) => e.includes("OpenZeppelin contracts not found"))).toBe(true);
   });
 
-  it("reports error when OZ simulator path is missing", async () => {
-    mockIsCompilerInstalled.mockResolvedValue(true);
-    mockExistsSync.mockImplementation((p: string) => {
-      if (p.includes("simulator")) return false;
-      return true;
-    });
-
-    const result = await validateStartup();
-
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes("OpenZeppelin simulator not found"))).toBe(true);
-  });
-
   it("reports multiple errors when all dependencies are missing", async () => {
     mockIsCompilerInstalled.mockResolvedValue(false);
     mockExistsSync.mockReturnValue(false);
@@ -84,9 +70,8 @@ describe("validateStartup", () => {
     const result = await validateStartup();
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toHaveLength(3);
+    expect(result.errors).toHaveLength(2);
     expect(result.errors[0]).toContain("Compact CLI");
     expect(result.errors[1]).toContain("contracts");
-    expect(result.errors[2]).toContain("simulator");
   });
 });

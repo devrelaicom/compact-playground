@@ -302,7 +302,7 @@ describe("POST /compile/archive", () => {
       const body = (await res.json()) as Record<string, unknown>;
       expect(body.success).toBe(false);
       expect(body.error).toBe("Internal server error");
-      expect(body.message).toBe("Unexpected compiler crash");
+      expect(body.message).toBe("An unexpected error occurred during processing");
     });
   });
 

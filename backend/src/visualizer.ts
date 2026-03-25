@@ -166,16 +166,24 @@ function mermaidId(id: string): string {
   return id.replace(/:/g, "_");
 }
 
+function escapeMermaidLabel(label: string): string {
+  return label
+    .replace(/"/g, '\\"')
+    .replace(/[[\]{}()<>`]/g, "")
+    .replace(/\r?\n/g, " ");
+}
+
 function mermaidNode(node: GraphNode): string {
   const id = mermaidId(node.id);
+  const label = escapeMermaidLabel(node.label);
   switch (node.type) {
     case "circuit":
-      return `${id}[["${node.label}()"]]`;
+      return `${id}[["${label}()"]]`;
     case "ledger":
-      return `${id}[("${node.label}")]`;
+      return `${id}[("${label}")]`;
     case "witness":
-      return `${id}{{"${node.label}"}}`;
+      return `${id}{{"${label}"}}`;
     default:
-      return `${id}["${node.label}"]`;
+      return `${id}["${label}"]`;
   }
 }
