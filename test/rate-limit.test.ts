@@ -19,6 +19,38 @@ describe("getClientIp", () => {
     resetConfig();
   });
 
+  describe("with X-Client-ID header", () => {
+    it("uses X-Client-ID as rate limit key with client: prefix", () => {
+      const c = mockContext({ "x-client-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479" });
+      expect(getClientIp(c)).toBe("client:f47ac10b-58cc-4372-a567-0e02b2c3d479");
+    });
+
+    it("takes precedence over all other headers", () => {
+      process.env.TRUST_PROXY = "true";
+      process.env.TRUST_CLOUDFLARE = "true";
+      resetConfig();
+      const c = mockContext({
+        "x-client-id": "my-client",
+        "cf-connecting-ip": "1.1.1.1",
+        "x-forwarded-for": "2.2.2.2",
+      });
+      expect(getClientIp(c)).toBe("client:my-client");
+    });
+
+    it("trims whitespace", () => {
+      const c = mockContext({ "x-client-id": "  my-client  " });
+      expect(getClientIp(c)).toBe("client:my-client");
+    });
+
+    it("ignores empty X-Client-ID and falls through", () => {
+      const c = mockContext(
+        { "x-client-id": "  " },
+        { incoming: { socket: { remoteAddress: "10.0.0.1" } } },
+      );
+      expect(getClientIp(c)).toBe("10.0.0.1");
+    });
+  });
+
   describe("with TRUST_PROXY=true", () => {
     beforeEach(() => {
       process.env.TRUST_PROXY = "true";
