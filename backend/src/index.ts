@@ -150,7 +150,14 @@ if (config.usingEphemeralCacheSalt) {
     );
   } catch {
     // Directory may not exist (e.g. deleted by a prior version). Recreate it.
-    await mkdir(config.cacheDir, { recursive: true }).catch(() => {});
+    try {
+      await mkdir(config.cacheDir, { recursive: true });
+    } catch (mkdirErr: unknown) {
+      startupLog.warn("Failed to recreate cache directory {dir}: {error}", {
+        dir: config.cacheDir,
+        error: String(mkdirErr),
+      });
+    }
   }
 }
 
