@@ -119,7 +119,24 @@
         codeEl.addEventListener("keydown", (e) => {
           if (e.key === "Tab") {
             e.preventDefault();
-            document.execCommand("insertText", false, "  ");
+
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+
+            const indentNode = document.createTextNode("  ");
+            range.insertNode(indentNode);
+
+            range.setStartAfter(indentNode);
+            range.collapse(true);
+
+            // Merge adjacent text nodes to prevent DOM fragmentation
+            codeEl.normalize();
+
+            selection.removeAllRanges();
+            selection.addRange(range);
           }
           // Ctrl+Enter to run
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
