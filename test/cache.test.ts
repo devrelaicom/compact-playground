@@ -81,6 +81,17 @@ describe("FileCache", () => {
     expect(await cache.get("format", "key1")).toEqual({ type: "format" });
   });
 
+  it("returns undefined from set when cache directory is not writable", async () => {
+    // Point cache at a path that cannot be created
+    const badCache = new FileCache("/nonexistent/unwritable/path", 60000, 100, 1000);
+
+    const result = await badCache.set("compile", "key1", { value: "test" });
+    expect(result).toBeUndefined();
+
+    // Verify the entry is not in the public index either
+    expect(await badCache.getByPublicId("anything")).toBeUndefined();
+  });
+
   it("evicts oldest entries when over maxEntries during purge", async () => {
     const smallCache = new FileCache(tempDir, 60000, 100, 3);
     await smallCache.init();

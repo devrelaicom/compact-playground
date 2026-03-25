@@ -219,7 +219,7 @@ export class FileCache {
     return this.index.get(key)?.publicId;
   }
 
-  async set(endpoint: string, key: string, data: unknown): Promise<string> {
+  async set(endpoint: string, key: string, data: unknown): Promise<string | undefined> {
     const path = this.filePath(endpoint, key);
     const publicId = this.index.get(key)?.publicId ?? randomUUID();
     const envelope: CacheEnvelope<unknown> = {
@@ -249,6 +249,7 @@ export class FileCache {
       }
     } catch (err) {
       log.warn("FileCache write error: {error}", { error: String(err) });
+      return undefined;
     }
 
     return publicId;
