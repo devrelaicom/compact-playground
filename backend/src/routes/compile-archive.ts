@@ -4,6 +4,7 @@ import { compileArchive } from "../archive-compiler.js";
 import { ArchiveValidationError, validateArchiveFormat } from "../archive.js";
 import { checkArchiveRateLimit, getClientIp } from "../rate-limit.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
+import { ExecutionQueueFullError } from "../execution-limiter.js";
 
 const MAX_COMPRESSED_SIZE = 1 * 1024 * 1024; // 1 MB
 
@@ -114,6 +115,17 @@ archiveCompileRoutes.post(
     } catch (error) {
       if (error instanceof ArchiveValidationError) {
         return c.json({ success: false, error: "Validation error", message: error.message }, 400);
+      }
+
+      if (error instanceof ExecutionQueueFullError) {
+        return c.json(
+          {
+            success: false,
+            error: "Service busy",
+            message: "The server is under heavy load. Please try again shortly.",
+          },
+          503,
+        );
       }
 
       routeLog.error("Archive compilation error: {error}", {

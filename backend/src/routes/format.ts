@@ -4,6 +4,7 @@ import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { runMultiVersion } from "../middleware.js";
 import { formatBodySchema } from "../request-schemas.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
+import { ExecutionQueueFullError } from "../execution-limiter.js";
 
 const formatRoutes = new Hono();
 
@@ -54,6 +55,17 @@ formatRoutes.post("/format", async (c) => {
       cacheKey,
     });
   } catch (error) {
+    if (error instanceof ExecutionQueueFullError) {
+      return c.json(
+        {
+          success: false,
+          error: "Service busy",
+          message: "The server is under heavy load. Please try again shortly.",
+        },
+        503,
+      );
+    }
+
     routeLog.error("Format error: {error}", { error: safeErrorMessage(error), route: "/format" });
     return c.json(
       {
