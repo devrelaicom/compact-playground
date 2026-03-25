@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
+    "@logtape/logtape": "^2.0.5",
     "hono": "^4.12.7",
     "tar-stream": "^3.1.8",
     "uuid": "^13.0.0",

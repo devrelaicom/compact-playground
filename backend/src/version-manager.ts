@@ -3,6 +3,7 @@ import { mkdir, symlink, stat } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 import { getConfig } from "./config.js";
+import { log } from "./logger.js";
 
 export interface ParsedVersion {
   major: number;
@@ -106,9 +107,9 @@ export async function getDefaultVersion(): Promise<string | null> {
 
   if (requested !== "latest" && isValidVersion(requested)) {
     if (!installed.includes(requested)) {
-      console.warn(
-        `Configured default version ${requested} is not installed, falling back to latest`,
-      );
+      log.warn("Configured default version {version} is not installed, falling back to latest", {
+        version: requested,
+      });
       return resolveVersion("latest", installed);
     }
     return requested;

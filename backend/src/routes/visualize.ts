@@ -6,6 +6,7 @@ import { buildSemanticModel } from "../analysis/semantic-model.js";
 import { generateContractGraph } from "../visualizer.js";
 import type { VisualizationResult } from "../visualizer.js";
 import { getFileCache, generateCacheKey } from "../cache.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const visualizeRoutes = new Hono();
 
@@ -47,7 +48,10 @@ visualizeRoutes.post("/visualize", async (c) => {
 
     return c.json({ ...result, cacheKey: cacheKey ?? undefined });
   } catch (error) {
-    console.error("Visualization error:", error);
+    routeLog.error("Visualization error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/visualize",
+    });
     const result: VisualizationResult = {
       success: false,
       errors: [

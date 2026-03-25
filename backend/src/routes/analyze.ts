@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { analyzeContract } from "../analysis/index.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { analyzeBodySchema } from "../request-schemas.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const analyzeRoutes = new Hono();
 
@@ -24,7 +25,10 @@ analyzeRoutes.post("/analyze", async (c) => {
     const { result, cacheKey } = await analyzeContract(code, { mode, versions, include, circuit });
     return c.json({ ...result, cacheKey });
   } catch (error) {
-    console.error("Analysis error:", error);
+    routeLog.error("Analysis error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/analyze",
+    });
     return c.json(
       {
         success: false,

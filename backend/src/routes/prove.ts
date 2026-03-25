@@ -5,6 +5,7 @@ import { buildProofAnalysis } from "../analysis/proof-analysis.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { proveBodySchema } from "../request-schemas.js";
 import { getFileCache, generateCacheKey } from "../cache.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const proveRoutes = new Hono();
 
@@ -56,7 +57,10 @@ proveRoutes.post("/prove", async (c) => {
 
     return c.json({ ...result, cacheKey: cacheKey ?? undefined });
   } catch (error) {
-    console.error("Prove analysis error:", error);
+    routeLog.error("Prove analysis error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/prove",
+    });
     return c.json(
       {
         success: false,
