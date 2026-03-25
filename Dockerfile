@@ -124,6 +124,7 @@ ENV NODE_ENV=production
 ENV PORT=8080
 ENV HOME=/home/appuser
 ENV PATH="/home/appuser/.compact/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ENV COMPACT_DIRECTORY=/home/appuser/.compact
 ENV TEMP_DIR=/tmp/compact-playground
 ENV COMPACT_CLI_PATH=compact
 ENV DEFAULT_COMPILER_VERSION=$DEFAULT_COMPILER
