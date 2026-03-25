@@ -1,5 +1,22 @@
 import { randomBytes } from "node:crypto";
 
+function parseIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+
+  const trimmed = raw.trim();
+  if (trimmed === "" || !/^-?\d+$/.test(trimmed)) {
+    throw new Error(`Invalid integer for ${name}: "${raw}"`);
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid integer for ${name}: "${raw}"`);
+  }
+
+  return parsed;
+}
+
 export interface Config {
   port: number;
   defaultCompilerVersion: string;
@@ -39,27 +56,27 @@ export function getConfig(): Config {
   }
 
   _config = {
-    port: parseInt(process.env.PORT || "8080", 10),
+    port: parseIntEnv("PORT", 8080),
     defaultCompilerVersion: process.env.DEFAULT_COMPILER_VERSION || "latest",
     tempDir: process.env.TEMP_DIR || "/tmp/compact-playground",
     compactCliPath: process.env.COMPACT_CLI_PATH || "compact",
-    compileTimeout: parseInt(process.env.COMPILE_TIMEOUT || "30000", 10),
-    formatTimeout: parseInt(process.env.FORMAT_TIMEOUT || "10000", 10),
-    maxConcurrentExecutions: parseInt(process.env.MAX_CONCURRENT_EXECUTIONS || "3", 10),
-    rateLimit: parseInt(process.env.RATE_LIMIT || "20", 10),
-    rateWindow: parseInt(process.env.RATE_WINDOW || "60000", 10),
+    compileTimeout: parseIntEnv("COMPILE_TIMEOUT", 30000),
+    formatTimeout: parseIntEnv("FORMAT_TIMEOUT", 10000),
+    maxConcurrentExecutions: parseIntEnv("MAX_CONCURRENT_EXECUTIONS", 3),
+    rateLimit: parseIntEnv("RATE_LIMIT", 20),
+    rateWindow: parseIntEnv("RATE_WINDOW", 60000),
     cacheEnabled: process.env.CACHE_ENABLED !== "false",
     cacheDir: process.env.CACHE_DIR || "/data/cache",
-    cacheMaxDiskMb: parseInt(process.env.CACHE_MAX_DISK_MB || "800", 10),
-    cacheMaxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || "50000", 10),
-    cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
+    cacheMaxDiskMb: parseIntEnv("CACHE_MAX_DISK_MB", 800),
+    cacheMaxEntries: parseIntEnv("CACHE_MAX_ENTRIES", 50000),
+    cacheTtl: parseIntEnv("CACHE_TTL", 2592000000), // 30 days
     cacheKeySalt: process.env.CACHE_KEY_SALT || _ephemeralCacheSalt || "",
     usingEphemeralCacheSalt,
-    maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "3", 10),
-    maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
-    maxJsonBodySize: parseInt(process.env.MAX_JSON_BODY_SIZE || String(512 * 1024), 10),
-    archiveRateLimit: parseInt(process.env.ARCHIVE_RATE_LIMIT || "10", 10),
-    archiveRateWindow: parseInt(process.env.ARCHIVE_RATE_WINDOW || "60000", 10),
+    maxVersionsPerRequest: parseIntEnv("MAX_VERSIONS_PER_REQUEST", 3),
+    maxCodeSize: parseIntEnv("MAX_CODE_SIZE", 100 * 1024),
+    maxJsonBodySize: parseIntEnv("MAX_JSON_BODY_SIZE", 512 * 1024),
+    archiveRateLimit: parseIntEnv("ARCHIVE_RATE_LIMIT", 10),
+    archiveRateWindow: parseIntEnv("ARCHIVE_RATE_WINDOW", 60000),
     trustCloudflare: process.env.TRUST_CLOUDFLARE === "true",
     trustProxy: process.env.TRUST_PROXY === "true",
     ozContractsPath: process.env.OZ_CONTRACTS_PATH || "/opt/oz-compact/contracts/src",

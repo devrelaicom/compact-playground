@@ -93,4 +93,66 @@ describe("config", () => {
     expect(config.usingEphemeralCacheSalt).toBe(false);
     expect(config.cacheKeySalt).toBe("fixed-salt");
   });
+
+  describe("numeric env validation", () => {
+    it("throws on non-numeric PORT", () => {
+      process.env.PORT = "abc";
+      expect(() => getConfig()).toThrow('Invalid integer for PORT: "abc"');
+    });
+
+    it("throws on non-numeric COMPILE_TIMEOUT", () => {
+      process.env.COMPILE_TIMEOUT = "not-a-number";
+      expect(() => getConfig()).toThrow('Invalid integer for COMPILE_TIMEOUT: "not-a-number"');
+    });
+
+    it("throws on non-numeric RATE_LIMIT", () => {
+      process.env.RATE_LIMIT = "";
+      expect(() => getConfig()).toThrow('Invalid integer for RATE_LIMIT: ""');
+    });
+
+    it("throws on non-numeric MAX_CODE_SIZE", () => {
+      process.env.MAX_CODE_SIZE = "big";
+      expect(() => getConfig()).toThrow('Invalid integer for MAX_CODE_SIZE: "big"');
+    });
+
+    it("accepts valid numeric env vars", () => {
+      process.env.PORT = "3000";
+      process.env.COMPILE_TIMEOUT = "60000";
+      process.env.RATE_LIMIT = "50";
+
+      const config = getConfig();
+
+      expect(config.port).toBe(3000);
+      expect(config.compileTimeout).toBe(60000);
+      expect(config.rateLimit).toBe(50);
+    });
+
+    it("uses defaults when numeric env vars are unset", () => {
+      delete process.env.PORT;
+      delete process.env.COMPILE_TIMEOUT;
+      delete process.env.MAX_CODE_SIZE;
+
+      const config = getConfig();
+
+      expect(config.port).toBe(8080);
+      expect(config.compileTimeout).toBe(30000);
+      expect(config.maxCodeSize).toBe(100 * 1024);
+    });
+
+    it("throws on value with trailing non-numeric characters", () => {
+      process.env.COMPILE_TIMEOUT = "30s";
+      expect(() => getConfig()).toThrow('Invalid integer for COMPILE_TIMEOUT: "30s"');
+    });
+
+    it("still resets correctly after validation errors", () => {
+      process.env.PORT = "abc";
+      expect(() => getConfig()).toThrow();
+
+      resetConfig();
+      delete process.env.PORT;
+
+      const config = getConfig();
+      expect(config.port).toBe(8080);
+    });
+  });
 });
