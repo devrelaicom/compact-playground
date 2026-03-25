@@ -3,6 +3,7 @@ import { analyzeContract } from "../analysis/index.js";
 import { checkRateLimit, getClientIp } from "../rate-limit.js";
 import { analyzeBodySchema } from "../request-schemas.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
+import { RequestAbortedError } from "../process-utils.js";
 
 const analyzeRoutes = new Hono();
 
@@ -22,9 +23,19 @@ analyzeRoutes.post("/analyze", async (c) => {
   const { code, mode, versions, include, circuit } = parsed.data;
 
   try {
-    const { result, cacheKey } = await analyzeContract(code, { mode, versions, include, circuit });
+    const { result, cacheKey } = await analyzeContract(code, {
+      mode,
+      versions,
+      include,
+      circuit,
+      signal: c.req.raw.signal,
+    });
     return c.json({ ...result, cacheKey });
   } catch (error) {
+    if (error instanceof RequestAbortedError) {
+      return new Response(null, { status: 499 });
+    }
+
     routeLog.error("Analysis error: {error}", {
       error: safeErrorMessage(error),
       route: "/analyze",

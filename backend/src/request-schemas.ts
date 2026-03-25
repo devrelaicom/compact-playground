@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const SCHEMA_MAX_VERSIONS = 10;
+
 export const compileBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
   options: z
@@ -14,7 +16,10 @@ export const compileBodySchema = z.object({
     })
     .optional()
     .default({}),
-  versions: z.array(z.string()).optional(),
+  versions: z
+    .array(z.string())
+    .max(SCHEMA_MAX_VERSIONS, `Maximum ${String(SCHEMA_MAX_VERSIONS)} versions are allowed`)
+    .optional(),
 });
 
 export const formatBodySchema = z.object({
@@ -26,13 +31,19 @@ export const formatBodySchema = z.object({
     })
     .optional()
     .default({}),
-  versions: z.array(z.string()).optional(),
+  versions: z
+    .array(z.string())
+    .max(SCHEMA_MAX_VERSIONS, `Maximum ${String(SCHEMA_MAX_VERSIONS)} versions are allowed`)
+    .optional(),
 });
 
 export const analyzeBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
   mode: z.enum(["fast", "deep"]).optional().default("fast"),
-  versions: z.array(z.string()).optional(),
+  versions: z
+    .array(z.string())
+    .max(SCHEMA_MAX_VERSIONS, `Maximum ${String(SCHEMA_MAX_VERSIONS)} versions are allowed`)
+    .optional(),
   include: z
     .array(
       z.enum(["diagnostics", "facts", "findings", "recommendations", "circuits", "compilation"]),

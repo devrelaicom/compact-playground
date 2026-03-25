@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, readdir, rm } from "node:fs/promises";
+import type { Server } from "node:http";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -47,6 +49,8 @@ app.use(
 );
 
 app.use("*", async (c, next) => {
+  const requestId = c.req.header("x-request-id")?.trim() || randomUUID();
+  c.header("X-Request-Id", requestId);
   await next();
   c.header("X-Content-Type-Options", "nosniff");
   c.header("X-Frame-Options", "DENY");
@@ -183,7 +187,10 @@ warmVersionsCache()
 const server = serve({
   fetch: app.fetch,
   port,
-});
+}) as Server;
+
+server.requestTimeout = 60_000;
+server.headersTimeout = 10_000;
 
 registerShutdownHandlers(server);
 

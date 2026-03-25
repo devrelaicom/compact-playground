@@ -209,7 +209,8 @@ describe("POST /compile/archive", () => {
       const [buf, entry, opts] = mockCompileArchive.mock.calls[0] as [Buffer, string, unknown];
       expect(Buffer.isBuffer(buf)).toBe(true);
       expect(entry).toBe("main.compact");
-      expect(opts).toBeUndefined();
+      expect(opts).toBeDefined();
+      expect((opts as { signal?: AbortSignal }).signal).toBeInstanceOf(AbortSignal);
     });
 
     it("passes options through when provided", async () => {
@@ -229,9 +230,11 @@ describe("POST /compile/archive", () => {
       const [, , opts] = mockCompileArchive.mock.calls[0] as [
         Buffer,
         string,
-        Record<string, unknown>,
+        { skipZk?: boolean; timeout?: number; signal?: AbortSignal },
       ];
-      expect(opts).toEqual({ skipZk: true, timeout: 5000 });
+      expect(opts.skipZk).toBe(true);
+      expect(opts.timeout).toBe(5000);
+      expect(opts.signal).toBeInstanceOf(AbortSignal);
     });
   });
 
@@ -407,9 +410,11 @@ describe("POST /compile/archive", () => {
       const [, , opts] = mockCompileArchive.mock.calls[0] as [
         Buffer,
         string,
-        Record<string, unknown>,
+        { skipZk?: boolean; timeout?: number; signal?: AbortSignal },
       ];
-      expect(opts).toEqual({ skipZk: true, timeout: 5000 });
+      expect(opts.skipZk).toBe(true);
+      expect(opts.timeout).toBe(5000);
+      expect(opts.signal).toBeInstanceOf(AbortSignal);
     });
   });
 });

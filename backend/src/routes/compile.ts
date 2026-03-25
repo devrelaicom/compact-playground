@@ -5,6 +5,7 @@ import { runMultiVersion } from "../middleware.js";
 import { compileBodySchema } from "../request-schemas.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
 import { ExecutionQueueFullError } from "../execution-limiter.js";
+import { RequestAbortedError } from "../process-utils.js";
 
 const compileRoutes = new Hono();
 
@@ -29,12 +30,13 @@ compileRoutes.post("/compile", async (c) => {
   }
 
   const { code, options, versions } = parsed.data;
+  const signal = c.req.raw.signal;
 
   try {
     // Multi-version: compile against each version
     if (versions && versions.length > 0) {
       const mvResults = await runMultiVersion(versions, code, async (version) => {
-        const { result } = await compile(code, { ...options, version });
+        const { result } = await compile(code, { ...options, version, signal });
         return result as unknown as Record<string, unknown>;
       });
 
@@ -57,12 +59,16 @@ compileRoutes.post("/compile", async (c) => {
     }
 
     // Single version
-    const { result, cacheKey } = await compile(code, options);
+    const { result, cacheKey } = await compile(code, { ...options, signal });
     return c.json({
       results: [{ ...result, requestedVersion: options.version ?? "default" }],
       cacheKey,
     });
   } catch (error) {
+    if (error instanceof RequestAbortedError) {
+      return new Response(null, { status: 499 });
+    }
+
     if (error instanceof ExecutionQueueFullError) {
       return c.json(
         {

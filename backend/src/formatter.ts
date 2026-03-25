@@ -7,10 +7,17 @@ import { getDefaultVersion, prepareVersionDir } from "./version-manager.js";
 import { getFileCache, generateCacheKey } from "./cache.js";
 import type { FormatterError } from "./types.js";
 import { acquireExecutionSlot, releaseExecutionSlot } from "./execution-limiter.js";
+import {
+  attachCappedOutput,
+  buildChildProcessEnv,
+  ProcessOutputLimitError,
+  RequestAbortedError,
+} from "./process-utils.js";
 
 export interface FormatOptions {
   timeout?: number;
   version?: string;
+  signal?: AbortSignal;
 }
 
 export interface FormatResult {
@@ -91,7 +98,7 @@ export async function formatCode(
       : ["format", sourceFile];
 
     const timeout = Math.min(options.timeout ?? config.formatTimeout, config.formatTimeout);
-    const result = await runFormatter(compactCli, formatArgs, timeout);
+    const result = await runFormatter(compactCli, formatArgs, timeout, options.signal);
 
     if (result.exitCode !== 0) {
       return {
@@ -136,10 +143,16 @@ async function runFormatter(
   path: string,
   args: string[],
   timeout: number,
+  signal?: AbortSignal,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  await acquireExecutionSlot();
+  await acquireExecutionSlot(signal);
 
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new RequestAbortedError());
+      return;
+    }
+
     let slotReleased = false;
     const releaseSlot = () => {
       if (!slotReleased) {
@@ -148,18 +161,29 @@ async function runFormatter(
       }
     };
 
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearAbortListener = () => {
+      if (signal) {
+        signal.removeEventListener("abort", onAbort);
+      }
+    };
+
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      proc.kill("SIGTERM");
+      killTimer = setTimeout(() => proc.kill("SIGKILL"), 2000);
+      reject(new RequestAbortedError());
+    };
+
     const proc = spawn(path, args, {
-      env: { ...process.env, TERM: "dumb" },
+      env: buildChildProcessEnv(),
     });
 
-    let stdout = "";
-    let stderr = "";
     let settled = false;
+    const output = attachCappedOutput(proc);
+    signal?.addEventListener("abort", onAbort, { once: true });
 
-    proc.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
-    proc.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
-
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
     const timeoutId = setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -172,16 +196,26 @@ async function runFormatter(
 
     proc.on("close", (code) => {
       releaseSlot();
+      clearAbortListener();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
-        resolve({ exitCode: code ?? 1, stdout, stderr });
+        if (output.wasLimitExceeded()) {
+          reject(new ProcessOutputLimitError());
+          return;
+        }
+        resolve({
+          exitCode: code ?? 1,
+          stdout: output.getStdout(),
+          stderr: output.getStderr(),
+        });
       }
     });
 
     proc.on("error", (error) => {
       releaseSlot();
+      clearAbortListener();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {

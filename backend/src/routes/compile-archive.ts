@@ -6,6 +6,7 @@ import { checkArchiveRateLimit, getClientIp } from "../rate-limit.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
 import { ExecutionQueueFullError } from "../execution-limiter.js";
 import { archiveOptionsSchema } from "../request-schemas.js";
+import { RequestAbortedError } from "../process-utils.js";
 
 const MAX_COMPRESSED_SIZE = 1 * 1024 * 1024; // 1 MB
 
@@ -122,12 +123,19 @@ archiveCompileRoutes.post(
     }
 
     try {
-      const { result, cacheKey } = await compileArchive(archiveBuffer, entryPoint, options);
+      const { result, cacheKey } = await compileArchive(archiveBuffer, entryPoint, {
+        ...options,
+        signal: c.req.raw.signal,
+      });
       return c.json({
         results: [{ ...result, requestedVersion: "detect" }],
         cacheKey,
       });
     } catch (error) {
+      if (error instanceof RequestAbortedError) {
+        return new Response(null, { status: 499 });
+      }
+
       if (error instanceof ArchiveValidationError) {
         return c.json({ success: false, error: "Validation error", message: error.message }, 400);
       }

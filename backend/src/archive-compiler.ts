@@ -18,7 +18,7 @@ import { getConfig } from "./config.js";
 export async function compileArchive(
   archiveBuffer: Buffer,
   entryPoint: string,
-  options?: { skipZk?: boolean; timeout?: number },
+  options?: { skipZk?: boolean; timeout?: number; signal?: AbortSignal },
 ): Promise<{ result: CompileResult; cacheKey?: string }> {
   const config = getConfig();
   const startTime = Date.now();
@@ -90,7 +90,7 @@ export async function compileArchive(
 
     // Step 9: Run compiler (clamp timeout to server max)
     const timeout = Math.min(options?.timeout ?? config.compileTimeout, config.compileTimeout);
-    const result = await runCompiler(compileArgs, timeout);
+    const result = await runCompiler(compileArgs, timeout, options?.signal);
 
     const executionTime = Date.now() - startTime;
 

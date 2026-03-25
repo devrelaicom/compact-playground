@@ -204,7 +204,12 @@ export async function analyzeContract(
 
     if (options.versions && options.versions.length > 0) {
       const mvResults = await runMultiVersion(options.versions, code, async (version) => {
-        const { result } = await compile(code, { wrapWithDefaults: true, skipZk: true, version });
+        const { result } = await compile(code, {
+          wrapWithDefaults: true,
+          skipZk: true,
+          version,
+          signal: options.signal,
+        });
         return {
           success: result.success,
           compilerVersion: result.compilerVersion,
@@ -224,6 +229,7 @@ export async function analyzeContract(
       const { result: compileResult } = await compile(code, {
         wrapWithDefaults: true,
         skipZk: true,
+        signal: options.signal,
       });
       response.compilations = [
         {

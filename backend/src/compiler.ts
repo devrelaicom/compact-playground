@@ -14,6 +14,12 @@ import { getDefaultVersion, getCompilerLanguageVersion } from "./version-manager
 import { getFileCache, generateCacheKey } from "./cache.js";
 import { linkLibraries } from "./libraries.js";
 import { acquireExecutionSlot, releaseExecutionSlot } from "./execution-limiter.js";
+import {
+  attachCappedOutput,
+  buildChildProcessEnv,
+  ProcessOutputLimitError,
+  RequestAbortedError,
+} from "./process-utils.js";
 
 export interface CompileOptions {
   wrapWithDefaults?: boolean;
@@ -23,6 +29,7 @@ export interface CompileOptions {
   version?: string;
   includeBindings?: boolean;
   libraries?: string[];
+  signal?: AbortSignal;
 }
 
 export interface CompileResult {
@@ -123,7 +130,7 @@ export async function compile(
     compileArgs.push(sourceFile, outputDir);
 
     const timeout = Math.min(options.timeout ?? config.compileTimeout, config.compileTimeout);
-    const result = await runCompiler(compileArgs, timeout);
+    const result = await runCompiler(compileArgs, timeout, options.signal);
 
     const executionTime = Date.now() - startTime;
 
@@ -235,10 +242,19 @@ interface CompilerOutput {
 /**
  * Runs the compact compiler with the given arguments
  */
-export async function runCompiler(args: string[], timeout: number): Promise<CompilerOutput> {
-  await acquireExecutionSlot();
+export async function runCompiler(
+  args: string[],
+  timeout: number,
+  signal?: AbortSignal,
+): Promise<CompilerOutput> {
+  await acquireExecutionSlot(signal);
 
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new RequestAbortedError());
+      return;
+    }
+
     const compactCli = getConfig().compactCliPath;
     let slotReleased = false;
     const releaseSlot = () => {
@@ -248,27 +264,29 @@ export async function runCompiler(args: string[], timeout: number): Promise<Comp
       }
     };
 
-    const proc = spawn(compactCli, args, {
-      env: {
-        ...process.env,
-        // Ensure TERM is set for proper output
-        TERM: "dumb",
-      },
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-
-    proc.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    proc.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
     let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearAbortListener = () => {
+      if (signal) {
+        signal.removeEventListener("abort", onAbort);
+      }
+    };
+
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      proc.kill("SIGTERM");
+      killTimer = setTimeout(() => proc.kill("SIGKILL"), 2000);
+      reject(new RequestAbortedError());
+    };
+
+    const proc = spawn(compactCli, args, {
+      env: buildChildProcessEnv(),
+    });
+
+    let settled = false;
+    const output = attachCappedOutput(proc);
+    signal?.addEventListener("abort", onAbort, { once: true });
+
     const timeoutId = setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -281,20 +299,26 @@ export async function runCompiler(args: string[], timeout: number): Promise<Comp
 
     proc.on("close", (code) => {
       releaseSlot();
+      clearAbortListener();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {
         settled = true;
+        if (output.wasLimitExceeded()) {
+          reject(new ProcessOutputLimitError());
+          return;
+        }
         resolve({
           exitCode: code ?? 1,
-          stdout,
-          stderr,
+          stdout: output.getStdout(),
+          stderr: output.getStderr(),
         });
       }
     });
 
     proc.on("error", (error) => {
       releaseSlot();
+      clearAbortListener();
       clearTimeout(timeoutId);
       if (killTimer) clearTimeout(killTimer);
       if (!settled) {
