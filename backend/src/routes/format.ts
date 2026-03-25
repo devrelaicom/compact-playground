@@ -5,6 +5,7 @@ import { runMultiVersion } from "../middleware.js";
 import { formatBodySchema } from "../request-schemas.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
 import { ExecutionQueueFullError } from "../execution-limiter.js";
+import { RequestAbortedError } from "../process-utils.js";
 
 const formatRoutes = new Hono();
 
@@ -22,12 +23,13 @@ formatRoutes.post("/format", async (c) => {
   }
 
   const { code, options, versions } = parsed.data;
+  const signal = c.req.raw.signal;
 
   try {
     // Multi-version: format with each version
     if (versions && versions.length > 0) {
       const mvResults = await runMultiVersion(versions, code, async (version) => {
-        const { result } = await formatCode(code, { ...options, version });
+        const { result } = await formatCode(code, { ...options, version, signal });
         return result as unknown as Record<string, unknown>;
       });
 
@@ -49,12 +51,16 @@ formatRoutes.post("/format", async (c) => {
     }
 
     // Single version
-    const { result, cacheKey } = await formatCode(code, options);
+    const { result, cacheKey } = await formatCode(code, { ...options, signal });
     return c.json({
       results: [{ ...result, requestedVersion: options.version ?? "default" }],
       cacheKey,
     });
   } catch (error) {
+    if (error instanceof RequestAbortedError) {
+      return new Response(null, { status: 499 });
+    }
+
     if (error instanceof ExecutionQueueFullError) {
       return c.json(
         {

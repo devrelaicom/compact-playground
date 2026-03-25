@@ -272,4 +272,5 @@ export interface AnalyzeOptions {
   versions?: string[];
   include?: IncludeSection[];
   circuit?: string;
+  signal?: AbortSignal;
 }

@@ -25,6 +25,7 @@ export interface Config {
   compileTimeout: number;
   formatTimeout: number;
   maxConcurrentExecutions: number;
+  maxQueueSize: number;
   rateLimit: number;
   rateWindow: number;
   cacheEnabled: boolean;
@@ -63,6 +64,7 @@ export function getConfig(): Config {
     compileTimeout: parseIntEnv("COMPILE_TIMEOUT", 30000),
     formatTimeout: parseIntEnv("FORMAT_TIMEOUT", 10000),
     maxConcurrentExecutions: parseIntEnv("MAX_CONCURRENT_EXECUTIONS", 3),
+    maxQueueSize: parseIntEnv("MAX_QUEUE_SIZE", 100),
     rateLimit: parseIntEnv("RATE_LIMIT", 20),
     rateWindow: parseIntEnv("RATE_WINDOW", 60000),
     cacheEnabled: process.env.CACHE_ENABLED !== "false",

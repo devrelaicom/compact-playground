@@ -154,7 +154,13 @@ describe("POST /compile", () => {
     expect(results[0].output).toBe("compiled output");
     expect(results[0].requestedVersion).toBe("default");
     expect(body.cacheKey).toBe("mock-key");
-    expect(mockCompile).toHaveBeenCalledWith("export circuit test(): [] {}", {});
+    expect(mockCompile).toHaveBeenCalledTimes(1);
+    const [, compileOptions] = mockCompile.mock.calls[0] as [
+      string,
+      { signal?: AbortSignal } | undefined,
+    ];
+    expect(compileOptions).toBeDefined();
+    expect(compileOptions?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("missing code → 400 with validation error", async () => {

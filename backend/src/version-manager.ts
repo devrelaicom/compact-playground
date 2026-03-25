@@ -4,6 +4,11 @@ import { join } from "path";
 import { homedir } from "os";
 import { getConfig } from "./config.js";
 import { log } from "./logger.js";
+import {
+  attachCappedOutput,
+  buildChildProcessEnv,
+  ProcessOutputLimitError,
+} from "./process-utils.js";
 
 export interface ParsedVersion {
   major: number;
@@ -68,12 +73,19 @@ export async function listInstalledVersions(): Promise<string[]> {
 
   return new Promise((resolve) => {
     const compactCli = getConfig().compactCliPath;
-    const proc = spawn(compactCli, ["list", "--installed"], { timeout: 5000 });
-
-    let stdout = "";
-    proc.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
+    const proc = spawn(compactCli, ["list", "--installed"], {
+      timeout: 5000,
+      env: buildChildProcessEnv(),
+    });
+    const output = attachCappedOutput(proc);
 
     proc.on("close", (code) => {
+      if (output.wasLimitExceeded()) {
+        resolve([]);
+        return;
+      }
+
+      const stdout = output.getStdout();
       if (code === 0 && stdout.trim()) {
         const versions = stdout
           .trim()
@@ -133,15 +145,18 @@ export async function getCompilerLanguageVersion(compilerVersion: string): Promi
     const compactCli = getConfig().compactCliPath;
     const proc = spawn(compactCli, ["compile", `+${compilerVersion}`, "--language-version"], {
       timeout: 10000,
-      env: { ...process.env, TERM: "dumb" },
+      env: buildChildProcessEnv(),
     });
-
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
-    proc.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
+    const output = attachCappedOutput(proc);
 
     proc.on("close", (code: number | null) => {
+      if (output.wasLimitExceeded()) {
+        reject(new ProcessOutputLimitError());
+        return;
+      }
+
+      const stdout = output.getStdout();
+      const stderr = output.getStderr();
       if (code === 0 && stdout.trim()) {
         // Older compilers may output extra lines (e.g. "Compactc version: 0.24.0\n0.16.0").
         // Extract the last line that looks like a semver version.
@@ -374,13 +389,17 @@ async function doInstall(
   return new Promise((resolve, reject) => {
     const proc = spawn(config.compactCliPath, ["update", version, "--directory", versionDir], {
       timeout: 120000,
-      env: { ...process.env, TERM: "dumb" },
+      env: buildChildProcessEnv(),
     });
-
-    let stderr = "";
-    proc.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
+    const output = attachCappedOutput(proc);
 
     proc.on("close", (code) => {
+      if (output.wasLimitExceeded()) {
+        reject(new ProcessOutputLimitError());
+        return;
+      }
+
+      const stderr = output.getStderr();
       if (code === 0) {
         ensuredVersions.add(version);
         resolve(versionDir);

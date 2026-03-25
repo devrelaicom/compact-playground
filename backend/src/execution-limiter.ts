@@ -1,6 +1,5 @@
 import { getConfig } from "./config.js";
-
-const MAX_QUEUE_SIZE = 100;
+import { RequestAbortedError } from "./process-utils.js";
 
 export class ExecutionQueueFullError extends Error {
   constructor() {
@@ -12,23 +11,39 @@ export class ExecutionQueueFullError extends Error {
 let activeExecutions = 0;
 const waitQueue: Array<() => void> = [];
 
-export async function acquireExecutionSlot(): Promise<void> {
-  const maxConcurrentExecutions = getConfig().maxConcurrentExecutions;
+export async function acquireExecutionSlot(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    throw new RequestAbortedError();
+  }
+
+  const { maxConcurrentExecutions, maxQueueSize } = getConfig();
 
   if (activeExecutions < maxConcurrentExecutions) {
     activeExecutions++;
     return;
   }
 
-  if (waitQueue.length >= MAX_QUEUE_SIZE) {
+  if (waitQueue.length >= maxQueueSize) {
     throw new ExecutionQueueFullError();
   }
 
-  await new Promise<void>((resolve) => {
-    waitQueue.push(() => {
+  await new Promise<void>((resolve, reject) => {
+    const onReady = () => {
+      signal?.removeEventListener("abort", onAbort);
       activeExecutions++;
       resolve();
-    });
+    };
+
+    const onAbort = () => {
+      const index = waitQueue.indexOf(onReady);
+      if (index >= 0) {
+        waitQueue.splice(index, 1);
+      }
+      reject(new RequestAbortedError());
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+    waitQueue.push(onReady);
   });
 }
 
