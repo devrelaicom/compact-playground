@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     xz-utils \
     unzip \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -123,5 +124,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Start the server
+# Entrypoint fixes volume mount permissions then drops to appuser
+USER root
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/backend/src/index.js"]
