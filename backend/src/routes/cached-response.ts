@@ -65,7 +65,8 @@ cachedResponseRoutes.get("/cached-response/:hash", async (c) => {
     return c.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred",
+        error: "Internal server error",
+        message: "An unexpected error occurred during processing",
       },
       500,
     );
