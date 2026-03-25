@@ -1,4 +1,7 @@
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
+import { execSync } from "child_process";
+import { homedir } from "os";
+import { join } from "path";
 import { Hono } from "hono";
 import { getCompilerVersion } from "../utils.js";
 import {
@@ -93,6 +96,55 @@ healthRoutes.get("/versions", (c) => {
     return c.json({ error: "Version information not yet available" }, 503);
   }
   return c.json(cachedVersionsResponse);
+});
+
+healthRoutes.get("/debug/versions", (c) => {
+  const home = homedir();
+  const compactDir = process.env.COMPACT_DIRECTORY || join(home, ".compact");
+  const versionsDir = join(compactDir, "versions");
+
+  let cliResult: { output: string; error: string; exitCode: number | null };
+  try {
+    const output = execSync("compact list --installed 2>&1", { timeout: 5000 }).toString();
+    cliResult = { output: output.trim(), error: "", exitCode: 0 };
+  } catch (err: unknown) {
+    const execErr = err as { status?: number; stdout?: Buffer; stderr?: Buffer };
+    cliResult = {
+      output: execErr.stdout?.toString().trim() ?? "",
+      error: execErr.stderr?.toString().trim() ?? "",
+      exitCode: execErr.status ?? -1,
+    };
+  }
+
+  let versionsDirInfo: { exists: boolean; contents: string[] };
+  try {
+    const contents = readdirSync(versionsDir);
+    versionsDirInfo = { exists: true, contents };
+  } catch {
+    versionsDirInfo = { exists: false, contents: [] };
+  }
+
+  let compactDirContents: string[] = [];
+  try {
+    compactDirContents = readdirSync(compactDir);
+  } catch {
+    // ignore
+  }
+
+  return c.json({
+    home,
+    compactDir,
+    compactDirContents,
+    versionsDir,
+    versionsDirInfo,
+    cliResult,
+    env: {
+      HOME: process.env.HOME,
+      COMPACT_DIRECTORY: process.env.COMPACT_DIRECTORY,
+      COMPACT_CLI_PATH: process.env.COMPACT_CLI_PATH,
+      PATH: process.env.PATH,
+    },
+  });
 });
 
 healthRoutes.get("/libraries", async (c) => {
