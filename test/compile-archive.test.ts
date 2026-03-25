@@ -329,5 +329,87 @@ describe("POST /compile/archive", () => {
       expect(body.success).toBe(false);
       expect(body.message).toBe("options must be valid JSON");
     });
+
+    it("non-numeric timeout in options → 400", async () => {
+      const archive = await createTarGz({ "main.compact": "code" });
+      const form = buildFormData(archive, "main.compact", { timeout: "slow" });
+
+      const res = await app.request("/compile/archive", {
+        method: "POST",
+        body: form,
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.success).toBe(false);
+      expect(body.message).toContain("Invalid options");
+    });
+
+    it("negative timeout in options → 400", async () => {
+      const archive = await createTarGz({ "main.compact": "code" });
+      const form = buildFormData(archive, "main.compact", { timeout: -1 });
+
+      const res = await app.request("/compile/archive", {
+        method: "POST",
+        body: form,
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.success).toBe(false);
+      expect(body.message).toContain("Invalid options");
+    });
+
+    it("oversized timeout in options → 400", async () => {
+      const archive = await createTarGz({ "main.compact": "code" });
+      const form = buildFormData(archive, "main.compact", { timeout: 999999 });
+
+      const res = await app.request("/compile/archive", {
+        method: "POST",
+        body: form,
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.success).toBe(false);
+      expect(body.message).toContain("Invalid options");
+    });
+
+    it("non-boolean skipZk in options → 400", async () => {
+      const archive = await createTarGz({ "main.compact": "code" });
+      const form = buildFormData(archive, "main.compact", { skipZk: "yes" });
+
+      const res = await app.request("/compile/archive", {
+        method: "POST",
+        body: form,
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.success).toBe(false);
+      expect(body.message).toContain("Invalid options");
+    });
+
+    it("valid options with timeout are accepted", async () => {
+      mockCompileArchive.mockResolvedValue({
+        result: { success: true, output: "ok", compiledAt: "2024-01-01T00:00:00Z" },
+      });
+
+      const archive = await createTarGz({ "main.compact": "code" });
+      const form = buildFormData(archive, "main.compact", { skipZk: true, timeout: 5000 });
+
+      const res = await app.request("/compile/archive", {
+        method: "POST",
+        body: form,
+      });
+
+      expect(res.status).toBe(200);
+      const [, , opts] = mockCompileArchive.mock.calls[0] as [
+        Buffer,
+        string,
+        Record<string, unknown>,
+      ];
+      expect(opts).toEqual({ skipZk: true, timeout: 5000 });
+    });
   });
 });

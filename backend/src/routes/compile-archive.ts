@@ -4,6 +4,7 @@ import { compileArchive } from "../archive-compiler.js";
 import { ArchiveValidationError, validateArchiveFormat } from "../archive.js";
 import { checkArchiveRateLimit, getClientIp } from "../rate-limit.js";
 import { routeLog, safeErrorMessage } from "../logger.js";
+import { archiveOptionsSchema } from "../request-schemas.js";
 
 const MAX_COMPRESSED_SIZE = 1 * 1024 * 1024; // 1 MB
 
@@ -91,18 +92,32 @@ archiveCompileRoutes.post(
       );
     }
 
-    // Parse optional options JSON
+    // Parse and validate optional options JSON
     let options: { skipZk?: boolean; timeout?: number } | undefined;
     const optionsRaw = body["options"];
     if (optionsRaw && typeof optionsRaw === "string") {
+      let parsed: unknown;
       try {
-        options = JSON.parse(optionsRaw) as { skipZk?: boolean; timeout?: number };
+        parsed = JSON.parse(optionsRaw);
       } catch {
         return c.json(
           { success: false, error: "Invalid request", message: "options must be valid JSON" },
           400,
         );
       }
+
+      const validated = archiveOptionsSchema.safeParse(parsed);
+      if (!validated.success) {
+        return c.json(
+          {
+            success: false,
+            error: "Invalid request",
+            message: "Invalid options: " + validated.error.issues[0].message,
+          },
+          400,
+        );
+      }
+      options = validated.data;
     }
 
     try {
