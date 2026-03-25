@@ -85,15 +85,21 @@ function getRuntimeIp(c: Context): string | null {
 }
 
 /**
- * Extracts client IP from request based on trust configuration.
+ * Extracts a client identity for rate limiting.
  *
  * Precedence:
- * 1. TRUST_CLOUDFLARE=true → CF-Connecting-IP (set by Cloudflare, not spoofable)
- * 2. TRUST_PROXY=true → x-forwarded-for / x-real-ip (only safe behind a trusted reverse proxy)
- * 3. Runtime/platform-provided client IP (e.g. Node socket remoteAddress)
- * 4. "unknown" (safe final fallback)
+ * 1. X-Client-ID header (opaque per-instance ID sent by MCP/API clients)
+ * 2. TRUST_CLOUDFLARE=true → CF-Connecting-IP (set by Cloudflare, not spoofable)
+ * 3. TRUST_PROXY=true → x-forwarded-for / x-real-ip (only safe behind a trusted reverse proxy)
+ * 4. Runtime/platform-provided client IP (e.g. Node socket remoteAddress)
+ * 5. "unknown" (safe final fallback)
  */
 export function getClientIp(c: Context): string {
+  // X-Client-ID allows proxied clients (e.g. MCP servers) to get
+  // per-instance rate limit buckets instead of sharing one IP bucket.
+  const clientId = c.req.header("x-client-id");
+  if (clientId && clientId.trim()) return `client:${clientId.trim()}`;
+
   const config = getConfig();
 
   if (config.trustCloudflare) {
