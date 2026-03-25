@@ -39,7 +39,7 @@ export function getConfig(): Config {
     cacheMaxDiskMb: parseInt(process.env.CACHE_MAX_DISK_MB || "800", 10),
     cacheMaxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || "50000", 10),
     cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
-    maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "10", 10),
+    maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "3", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
     archiveRateLimit: parseInt(process.env.ARCHIVE_RATE_LIMIT || "10", 10),
     archiveRateWindow: parseInt(process.env.ARCHIVE_RATE_WINDOW || "60000", 10),

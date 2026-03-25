@@ -60,9 +60,9 @@ describe("validateRequestBody", () => {
     expect(body.error).toBe("Code too large");
   });
 
-  it("rejects versions array exceeding limit", async () => {
+  it("rejects versions array exceeding limit of 3", async () => {
     const app = createApp();
-    const versions = Array.from({ length: 15 }, (_, i) => `0.${String(i)}.0`);
+    const versions = ["0.28.0", "0.29.0", "0.30.0", "0.26.0"];
     const res = await app.request("/compile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,6 +71,18 @@ describe("validateRequestBody", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.error).toBe("Too many versions");
+    expect(body.message).toBe("Maximum 3 versions per request");
+  });
+
+  it("allows exactly 3 versions", async () => {
+    const app = createApp();
+    const versions = ["0.28.0", "0.29.0", "0.30.0"];
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "test", versions }),
+    });
+    expect(res.status).toBe(200);
   });
 
   it("rejects oversized 'before' in /diff", async () => {

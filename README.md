@@ -326,7 +326,7 @@ All settings are controlled via environment variables:
 | `CACHE_MAX_ENTRIES` | `50000` | Max cached entries |
 | `CACHE_TTL` | `2592000000` | Cache entry TTL in ms (30 days) |
 | `MAX_CODE_SIZE` | `102400` | Max code size in bytes (100 KB) |
-| `MAX_VERSIONS_PER_REQUEST` | `10` | Max versions in a multi-version request |
+| `MAX_VERSIONS_PER_REQUEST` | `3` | Max versions in a multi-version request |
 | `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
 | `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
 | `OZ_CONTRACTS_PATH` | `/opt/oz-compact/contracts/src` | Path to OpenZeppelin Compact contracts |
