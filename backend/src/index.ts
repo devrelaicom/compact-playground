@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -148,24 +148,21 @@ if (config.usingEphemeralCacheSalt) {
     await Promise.all(
       entries.map((entry) => rm(join(config.cacheDir, entry), { recursive: true, force: true })),
     );
-  } catch (err: unknown) {
-    startupLog.warn("Failed to clear cache directory for ephemeral salt: {error}", {
-      error: String(err),
-    });
+  } catch {
+    // Directory may not exist (e.g. deleted by a prior version). Recreate it.
+    await mkdir(config.cacheDir, { recursive: true }).catch(() => {});
   }
 }
 
 // Initialize file cache and warm versions cache at startup
 const fileCache = getFileCache();
 if (fileCache) {
-  fileCache
-    .init()
-    .then(() => {
-      startupLog.info("File cache initialized");
-    })
-    .catch((err: unknown) => {
-      startupLog.warn("Failed to initialize file cache: {error}", { error: String(err) });
-    });
+  try {
+    await fileCache.init();
+    startupLog.info("File cache initialized");
+  } catch (err: unknown) {
+    startupLog.warn("Failed to initialize file cache: {error}", { error: String(err) });
+  }
 }
 
 warmVersionsCache()
