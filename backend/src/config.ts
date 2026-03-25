@@ -11,6 +11,7 @@ export interface Config {
   cacheMaxDiskMb: number;
   cacheMaxEntries: number;
   cacheTtl: number;
+  cacheKeySalt: string;
   maxVersionsPerRequest: number;
   maxCodeSize: number;
   maxJsonBodySize: number;
@@ -40,6 +41,7 @@ export function getConfig(): Config {
     cacheMaxDiskMb: parseInt(process.env.CACHE_MAX_DISK_MB || "800", 10),
     cacheMaxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || "50000", 10),
     cacheTtl: parseInt(process.env.CACHE_TTL || "2592000000", 10), // 30 days
+    cacheKeySalt: process.env.CACHE_KEY_SALT || "",
     maxVersionsPerRequest: parseInt(process.env.MAX_VERSIONS_PER_REQUEST || "3", 10),
     maxCodeSize: parseInt(process.env.MAX_CODE_SIZE || String(100 * 1024), 10),
     maxJsonBodySize: parseInt(process.env.MAX_JSON_BODY_SIZE || String(512 * 1024), 10),

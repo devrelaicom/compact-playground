@@ -14,10 +14,10 @@ export function generateArchiveCacheKey(
   version: string,
   options: Record<string, unknown>,
 ): string {
-  return createHash("sha256")
-    .update(archiveBuffer)
-    .update(JSON.stringify({ version, options }))
-    .digest("hex");
+  const { cacheKeySalt } = getConfig();
+  const hash = createHash("sha256");
+  if (cacheKeySalt) hash.update(cacheKeySalt);
+  return hash.update(archiveBuffer).update(JSON.stringify({ version, options })).digest("hex");
 }
 
 /** Generate a deterministic cache key from code + version + options */
@@ -26,9 +26,12 @@ export function generateCacheKey(
   compilerVersion: string,
   options: Record<string, unknown>,
 ): string {
+  const { cacheKeySalt } = getConfig();
   const normalized = normalizeForCacheKey(code);
   const payload = JSON.stringify({ code: normalized, version: compilerVersion, options });
-  return createHash("sha256").update(payload).digest("hex");
+  const hash = createHash("sha256");
+  if (cacheKeySalt) hash.update(cacheKeySalt);
+  return hash.update(payload).digest("hex");
 }
 
 interface IndexEntry {
