@@ -72,6 +72,11 @@ jobs:
           compact update 0.30.0
           compact update 0.29.0
           compact update 0.28.0
+          compact update 0.26.0
+          compact update 0.25.0
+          compact update 0.24.0
+          compact update 0.23.0
+          compact update 0.22.0
       - run: npm ci
       - run: npm run test:run
 
