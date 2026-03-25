@@ -767,4 +767,21 @@ describe("GET /cached-response/:hash", () => {
 
     expect(res.status).toBe(429);
   });
+
+  it("returns generic 500 without leaking internal error details", async () => {
+    const mockCache = {
+      getByPublicId: vi.fn().mockRejectedValue(new Error("ENOENT: /data/cache/internal/path.json")),
+    };
+    (getFileCache as ReturnType<typeof vi.fn>).mockReturnValue(mockCache);
+
+    const res = await app.request(`/cached-response/${validCacheToken}`, { method: "GET" });
+
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Internal server error");
+    expect(body.message).toBe("An unexpected error occurred during processing");
+    expect(JSON.stringify(body)).not.toContain("ENOENT");
+    expect(JSON.stringify(body)).not.toContain("/data/cache");
+  });
 });

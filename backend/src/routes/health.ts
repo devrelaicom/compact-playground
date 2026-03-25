@@ -10,6 +10,7 @@ import {
 import { getConfig } from "../config.js";
 import { getFileCache } from "../cache.js";
 import { listAvailableLibraries } from "../libraries.js";
+import { routeLog, safeErrorMessage } from "../logger.js";
 
 const healthRoutes = new Hono();
 const HEALTH_CACHE_TTL_MS = 30_000;
@@ -103,10 +104,15 @@ healthRoutes.get("/libraries", async (c) => {
     const libraries = await listAvailableLibraries();
     return c.json({ libraries });
   } catch (error) {
+    routeLog.error("Libraries listing error: {error}", {
+      error: safeErrorMessage(error),
+      route: "/libraries",
+    });
     return c.json(
       {
-        error: "Failed to list libraries",
-        message: error instanceof Error ? error.message : "Unknown error",
+        success: false,
+        error: "Internal server error",
+        message: "An unexpected error occurred during processing",
       },
       500,
     );
