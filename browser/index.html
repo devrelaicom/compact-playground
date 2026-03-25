@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compact Playground - Browser WASM Compiler</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1>Compact Playground</h1>
+        <span class="badge">WASM</span>
+      </div>
+      <div class="header-right">
+        <span id="wasm-status" class="status loading">Loading WASM...</span>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <button id="btn-check" class="btn btn-primary" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        Check (WASM)
+      </button>
+      <button id="btn-compile" class="btn btn-success" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Compile (API)
+      </button>
+      <button id="btn-parse" class="btn btn-secondary" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        Parse AST
+      </button>
+      <div class="toolbar-spacer"></div>
+      <select id="example-select" class="select">
+        <option value="">Load Example...</option>
+        <option value="counter">Counter</option>
+        <option value="token">Token</option>
+        <option value="math-module">Math Module</option>
+        <option value="minimal">Minimal Circuit</option>
+      </select>
+      <label class="toggle">
+        <input type="checkbox" id="auto-check" checked>
+        <span>Auto-check</span>
+      </label>
+    </div>
+
+    <div class="main">
+      <div class="editor-panel">
+        <div class="panel-header">
+          <span>Editor</span>
+          <span id="cursor-pos" class="cursor-info">Ln 1, Col 1</span>
+        </div>
+        <div class="editor-wrapper">
+          <div id="line-numbers" class="line-numbers">1</div>
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">pragma language_version >= 0.21;
+
+import CompactStandardLibrary;
+
+export ledger counter: Counter;
+
+export circuit increment(): [] {
+  counter.increment(1);
+}
+
+export circuit decrement(): [] {
+  counter.decrement(1);
+}
+
+export circuit getCount(): Uint<64> {
+  return counter.read();
+}</textarea>
+        </div>
+      </div>
+
+      <div class="output-panel">
+        <div class="panel-header">
+          <div class="tab-bar">
+            <button class="tab active" data-tab="diagnostics">Diagnostics</button>
+            <button class="tab" data-tab="ast">AST</button>
+            <button class="tab" data-tab="tokens">Tokens</button>
+            <button class="tab" data-tab="compile">Compile Output</button>
+          </div>
+        </div>
+        <div id="tab-diagnostics" class="tab-content active">
+          <div class="placeholder">Edit code to see real-time diagnostics (powered by WASM)</div>
+        </div>
+        <div id="tab-ast" class="tab-content">
+          <div class="placeholder">Click "Parse AST" to view the abstract syntax tree</div>
+        </div>
+        <div id="tab-tokens" class="tab-content">
+          <div class="placeholder">Click "Parse AST" to view the token stream</div>
+        </div>
+        <div id="tab-compile" class="tab-content">
+          <div class="placeholder">Click "Compile (API)" to compile with the full Compact compiler</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <span>WASM module: 142KB | Lexer + Parser + Analyzer running locally in your browser</span>
+      <span>Full compilation requires the <a href="https://github.com/LFDT-Minokawa/compact" target="_blank">Compact compiler</a> via API</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
