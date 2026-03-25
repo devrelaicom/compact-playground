@@ -61,8 +61,10 @@ export async function compileArchive(
 
     // Step 7: Check cache
     const cache = getFileCache();
+    const normalizedEntryPoint = entryPoint.replace(/\\/g, "/");
     const cacheKey = cache
       ? generateArchiveCacheKey(archiveBuffer, detectedVersion, {
+          entryPoint: normalizedEntryPoint,
           skipZk: options?.skipZk,
         })
       : null;
@@ -86,8 +88,9 @@ export async function compileArchive(
 
     compileArgs.push(entryPointFullPath, outputDir);
 
-    // Step 9: Run compiler
-    const result = await runCompiler(compileArgs, options?.timeout || config.compileTimeout);
+    // Step 9: Run compiler (clamp timeout to server max)
+    const timeout = Math.min(options?.timeout ?? config.compileTimeout, config.compileTimeout);
+    const result = await runCompiler(compileArgs, timeout);
 
     const executionTime = Date.now() - startTime;
 
