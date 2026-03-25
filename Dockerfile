@@ -118,13 +118,17 @@ RUN groupadd --system appgroup \
     && mkdir -p /tmp/compact-playground /data/cache \
     && mv /root/.compact /home/appuser/.compact \
     && chown -R appuser:appgroup /home/appuser/.compact /tmp/compact-playground /data/cache /app
+# Fix the CLI's "current compiler" pointer after moving .compact from /root
+# compact update re-registers the default version under the new COMPACT_DIRECTORY
+USER appuser
+ENV HOME=/home/appuser
+ENV COMPACT_DIRECTORY=/home/appuser/.compact
+ENV PATH="/home/appuser/.compact/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+RUN compact update 0.30.0 && compact list --installed
 
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV HOME=/home/appuser
-ENV PATH="/home/appuser/.compact/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENV COMPACT_DIRECTORY=/home/appuser/.compact
 ENV TEMP_DIR=/tmp/compact-playground
 ENV COMPACT_CLI_PATH=compact
 ENV DEFAULT_COMPILER_VERSION=$DEFAULT_COMPILER
@@ -140,9 +144,6 @@ EXPOSE 8080
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
-
-# Switch to non-root user
-USER appuser
 
 # Start the server
 CMD ["node", "dist/backend/src/index.js"]
