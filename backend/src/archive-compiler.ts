@@ -61,8 +61,10 @@ export async function compileArchive(
 
     // Step 7: Check cache
     const cache = getFileCache();
+    const normalizedEntryPoint = entryPoint.replace(/\\/g, "/");
     const cacheKey = cache
       ? generateArchiveCacheKey(archiveBuffer, detectedVersion, {
+          entryPoint: normalizedEntryPoint,
           skipZk: options?.skipZk,
         })
       : null;

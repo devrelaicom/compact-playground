@@ -212,6 +212,30 @@ describe("generateArchiveCacheKey", () => {
     const b = generateArchiveCacheKey(archive, "0.26.0", { optimize: false });
     expect(a).not.toBe(b);
   });
+
+  it("produces different keys for different entryPoints", () => {
+    const a = generateArchiveCacheKey(archive, "0.26.0", {
+      entryPoint: "Vault.compact",
+      skipZk: true,
+    });
+    const b = generateArchiveCacheKey(archive, "0.26.0", {
+      entryPoint: "MathLib.compact",
+      skipZk: true,
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("produces same key for same entryPoint", () => {
+    const a = generateArchiveCacheKey(archive, "0.26.0", {
+      entryPoint: "Vault.compact",
+      skipZk: true,
+    });
+    const b = generateArchiveCacheKey(archive, "0.26.0", {
+      entryPoint: "Vault.compact",
+      skipZk: true,
+    });
+    expect(a).toBe(b);
+  });
 });
 
 describe("CACHE_KEY_SALT", () => {
