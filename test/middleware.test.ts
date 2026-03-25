@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import { runMultiVersion, validateRequestBody } from "../backend/src/middleware.js";
+import {
+  runMultiVersion,
+  validateRequestBody,
+  createJsonBodyLimit,
+} from "../backend/src/middleware.js";
 
 describe("runMultiVersion", () => {
   it("executes operation for each resolved version", async () => {
@@ -108,6 +112,100 @@ describe("validateRequestBody", () => {
   });
 
   it("passes through GET requests without checking body", async () => {
+    const app = createApp();
+    const res = await app.request("/health", { method: "GET" });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("createJsonBodyLimit", () => {
+  function createApp() {
+    const app = new Hono();
+    app.use("*", createJsonBodyLimit());
+    app.post("/compile", async (c) => {
+      await c.req.json();
+      return c.json({ success: true });
+    });
+    app.post("/prove", async (c) => {
+      await c.req.json();
+      return c.json({ success: true });
+    });
+    app.post("/simulate/deploy", async (c) => {
+      await c.req.json();
+      return c.json({ success: true });
+    });
+    app.post("/compile/archive", (c) => {
+      // Archive endpoint should bypass JSON body limit
+      return c.json({ success: true });
+    });
+    app.get("/health", (c) => c.json({ status: "ok" }));
+    return app;
+  }
+
+  it("rejects oversized JSON body on /compile with 413", async () => {
+    const app = createApp();
+    const oversizedBody = JSON.stringify({ code: "x".repeat(600 * 1024) });
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: oversizedBody,
+    });
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Payload too large");
+  });
+
+  it("rejects oversized JSON body on /prove with 413", async () => {
+    const app = createApp();
+    const oversizedBody = JSON.stringify({ code: "x".repeat(600 * 1024) });
+    const res = await app.request("/prove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: oversizedBody,
+    });
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Payload too large");
+  });
+
+  it("rejects oversized JSON body on /simulate/deploy with 413", async () => {
+    const app = createApp();
+    const oversizedBody = JSON.stringify({ code: "x".repeat(600 * 1024) });
+    const res = await app.request("/simulate/deploy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: oversizedBody,
+    });
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Payload too large");
+  });
+
+  it("allows requests under the size limit", async () => {
+    const app = createApp();
+    const res = await app.request("/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "small code" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("skips /compile/archive endpoint", async () => {
+    const app = createApp();
+    const res = await app.request("/compile/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "x".repeat(600 * 1024),
+    });
+    // Should reach the handler (200), not be blocked by JSON body limit
+    expect(res.status).toBe(200);
+  });
+
+  it("passes through GET requests", async () => {
     const app = createApp();
     const res = await app.request("/health", { method: "GET" });
     expect(res.status).toBe(200);
