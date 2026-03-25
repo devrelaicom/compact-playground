@@ -318,13 +318,19 @@ All settings are controlled via environment variables:
 | `COMPILE_TIMEOUT` | `30000` | Compilation timeout in ms |
 | `RATE_LIMIT` | `20` | Max requests per window per IP |
 | `RATE_WINDOW` | `60000` | Rate limit window in ms |
-| `CACHE_ENABLED` | `true` | Enable compilation cache |
-| `CACHE_MAX_SIZE` | `1000` | Max cache entries |
-| `CACHE_TTL` | `3600000` | Cache TTL in ms (1 hour) |
+| `ARCHIVE_RATE_LIMIT` | `10` | Max archive compile requests per IP per window |
+| `ARCHIVE_RATE_WINDOW` | `60000` | Archive rate limit window in ms |
+| `CACHE_ENABLED` | `true` | Enable file-based result caching |
+| `CACHE_DIR` | `/data/cache` | Persistent cache directory |
+| `CACHE_MAX_DISK_MB` | `800` | Max cache disk usage in MB |
+| `CACHE_MAX_ENTRIES` | `50000` | Max cached entries |
+| `CACHE_TTL` | `2592000000` | Cache entry TTL in ms (30 days) |
 | `MAX_CODE_SIZE` | `102400` | Max code size in bytes (100 KB) |
 | `MAX_VERSIONS_PER_REQUEST` | `10` | Max versions in a multi-version request |
 | `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP |
 | `TRUST_CLOUDFLARE` | `false` | Trust `CF-Connecting-IP` header for client IP |
+| `OZ_CONTRACTS_PATH` | `/opt/oz-compact/contracts/src` | Path to OpenZeppelin Compact contracts |
+| `OZ_SIMULATOR_PATH` | `/opt/oz-compact/packages/simulator` | Path to OZ simulator package |
 
 > **Learn Compact:** Set `DEFAULT_COMPILER_VERSION=0.26.0` to pin the compiler to match `pragma language_version >= 0.16 && <= 0.18` used in the tutorial contracts.
 
