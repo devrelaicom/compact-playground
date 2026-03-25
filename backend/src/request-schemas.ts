@@ -54,3 +54,8 @@ export const proveBodySchema = z.object({
   code: z.string().min(1, "Contract code is required"),
   circuit: z.string().optional(),
 });
+
+export const archiveOptionsSchema = z.object({
+  skipZk: z.boolean().optional(),
+  timeout: z.number().int().positive().max(30_000).optional(),
+});
