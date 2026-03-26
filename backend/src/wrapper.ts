@@ -6,8 +6,8 @@
  */
 
 // Default language version range
-const DEFAULT_MIN_VERSION = "0.16";
-const DEFAULT_MAX_VERSION = "0.18";
+const DEFAULT_MIN_VERSION = "0.20";
+const DEFAULT_MAX_VERSION = "0.21";
 
 /**
  * Checks if the code contains a pragma statement
