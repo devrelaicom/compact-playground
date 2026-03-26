@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const SCHEMA_MAX_VERSIONS = 10;
+const SCHEMA_MAX_VERSIONS = 3;
 
 export const compileBodySchema = z.object({
   code: z.string().min(1, "Code is required"),
