@@ -48,7 +48,7 @@ import CompactStandardLibrary;`;
 }`;
       const wrapped = wrapWithDefaults(code);
 
-      expect(wrapped).toContain("pragma language_version >= 0.16 && <= 0.18;");
+      expect(wrapped).toContain("pragma language_version >= 0.16 && <= 0.21;");
       expect(wrapped).toContain("import CompactStandardLibrary;");
       expect(wrapped).toContain(code);
     });
@@ -77,7 +77,7 @@ export ledger counter: Counter;`;
       const code = `export ledger counter: Counter;`;
       const wrapped = wrapWithDefaults(code, "0.17");
 
-      expect(wrapped).toContain("pragma language_version >= 0.17 && <= 0.18;");
+      expect(wrapped).toContain("pragma language_version >= 0.17 && <= 0.21;");
     });
   });
 

@@ -42,9 +42,9 @@ RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compac
     && chmod +x /root/.compact/bin/compact \
     && rm -rf /tmp/compact.tar.xz /tmp/compact-extract
 
-# Download Compact Compiler (compactc-v0.26.0)
+# Download Compact Compiler (compactc-v0.29.0)
 # The zip contains: compactc (wrapper script), compactc.bin, zkir, fixup-compact, format-compact
-RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compactc-v0.26.0/compactc_v0.26.0_x86_64-unknown-linux-musl.zip \
+RUN curl -fsSL https://github.com/midnightntwrk/compact/releases/download/compactc-v0.29.0/compactc_v0.29.0_x86_64-unknown-linux-musl.zip \
        -o /tmp/compactc.zip \
     && unzip -q /tmp/compactc.zip -d /root/.compact/bin/ \
     && chmod +x /root/.compact/bin/compactc \
