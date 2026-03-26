@@ -103,7 +103,11 @@ USER appuser
 ENV HOME=/home/appuser
 ENV COMPACT_DIRECTORY=/home/appuser/.compact
 ENV PATH="/home/appuser/.compact/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-RUN compact update 0.30.0 && compact list --installed
+RUN if [ "$DEFAULT_COMPILER" != "latest" ]; then \
+      compact update "$DEFAULT_COMPILER"; \
+    else \
+      compact update 0.30.0; \
+    fi && compact list --installed
 
 # Environment variables
 ENV NODE_ENV=production

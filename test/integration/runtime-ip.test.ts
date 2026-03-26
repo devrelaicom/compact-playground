@@ -28,7 +28,6 @@ async function canBindLoopbackPort(): Promise<boolean> {
  */
 describe("Runtime IP via @hono/node-server adapter", () => {
   let server: ReturnType<typeof serve> | undefined;
-  const port = 9876;
 
   afterAll(() => {
     server?.close();
@@ -55,10 +54,13 @@ describe("Runtime IP via @hono/node-server adapter", () => {
       return c.json({ ip: capturedIp });
     });
 
-    server = serve({ fetch: app.fetch, port });
-
-    // Wait for server to be ready
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Use port 0 to let the OS assign a free port
+    const port = await new Promise<number>((resolve) => {
+      server = serve({ fetch: app.fetch, port: 0 }, (info) => {
+        const addr = info as { port: number };
+        resolve(addr.port);
+      });
+    });
 
     const res = await fetch(`http://127.0.0.1:${String(port)}/ip-test`);
     const body = (await res.json()) as { ip: string };

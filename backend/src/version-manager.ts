@@ -338,6 +338,10 @@ const inFlightInstalls = new Map<string, Promise<string>>();
  * Returns the directory path for the version.
  */
 export async function prepareVersionDir(version: string): Promise<string> {
+  if (!isValidVersion(version)) {
+    throw new Error(`Invalid version format: ${version}. Expected semver like "0.29.0"`);
+  }
+
   const config = getConfig();
   const versionDir = join(config.tempDir, `compact-versions`, version);
 
