@@ -14,7 +14,8 @@ RUN npm ci
 COPY backend/ ./backend/
 
 # Build TypeScript for production (no source maps, no declarations, no tests)
-RUN npx tsc -p tsconfig.build.json
+RUN npx tsc -p tsconfig.build.json \
+    && npm prune --omit=dev
 
 # OZ Compact dependencies stage — clone in a lightweight image, keep git out of production
 FROM alpine/git AS oz-clone
@@ -85,11 +86,10 @@ COPY --from=oz-clone /opt/oz-compact/contracts /opt/oz-compact/contracts
 # Set up OZ environment variables
 ENV OZ_CONTRACTS_PATH=/opt/oz-compact/contracts/src
 
-# Copy built files from builder
+# Copy built files and production-only node_modules from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
-RUN npm prune --omit=dev
 
 # Create non-root user and writable directories
 RUN groupadd --system appgroup \
