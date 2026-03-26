@@ -4,14 +4,14 @@ Compile Compact smart contracts in the browser. Built for [Learn Compact](https:
 
 This project integrates with the Midnight Network.
 
-**Live API:** https://compact-playground.onrender.com
+**Live API:** https://compact-playground.up.railway.app
 
 ## API
 
 ### POST /compile
 
 ```bash
-curl -X POST https://compact-playground.onrender.com/compile \
+curl -X POST https://compact-playground.up.railway.app/compile \
   -H "Content-Type: application/json" \
   -d '{"code": "export circuit add(a: Uint<64>, b: Uint<64>): Uint<64> { return (a + b) as Uint<64>; }"}'
 ```
@@ -36,7 +36,7 @@ curl -X POST https://compact-playground.onrender.com/compile \
 ### GET /health
 
 ```bash
-curl https://compact-playground.onrender.com/health
+curl https://compact-playground.up.railway.app/health
 ```
 
 ## mdBook Integration
@@ -63,11 +63,11 @@ Code blocks get a Run button. Press `Ctrl+Enter` to compile.
 
 ## Deploy
 
-### Render.com
+### Railway
 
 1. Fork this repo
-2. Create Web Service on [render.com](https://render.com)
-3. Connect repo, select Docker runtime
+2. Create a new project on [railway.app](https://railway.app)
+3. Connect repo, it will auto-detect the Dockerfile
 4. Deploy
 
 ### Docker

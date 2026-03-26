@@ -33,7 +33,6 @@ export async function getCompilerVersion(): Promise<string | null> {
     proc.on("close", (code) => {
       if (code === 0 && stdout) {
         // Extract version number from output
-        // Expected format: "0.26.0" or similar
         const versionMatch = stdout.match(/(\d+\.\d+\.\d+)/);
         resolve(versionMatch ? versionMatch[1] : stdout.trim());
       } else {
@@ -45,26 +44,4 @@ export async function getCompilerVersion(): Promise<string | null> {
       resolve(null);
     });
   });
-}
-
-/**
- * Validates that a string is safe for use in a filename
- */
-export function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
-}
-
-/**
- * Creates a delay/sleep promise
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Truncates a string with ellipsis if too long
- */
-export function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength - 3) + "...";
 }

@@ -33,7 +33,7 @@ coverage
 Dockerfile.dev
 
 # Frontend files (not needed in backend container)
-# frontend/
+frontend/
 
 # Test fixtures
 test/
