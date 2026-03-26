@@ -4,7 +4,7 @@
 
 Compile, format, analyze, and diff [Compact](https://docs.midnight.network/) smart contracts through a simple REST API. Built for [Learn Compact](https://github.com/Olanetsoft/learn-compact) and the [Midnight Network](https://midnight.network/) ecosystem.
 
-**Live API:** https://compact-playground.onrender.com
+**Live API:** https://compact-playground.up.railway.app
 
 ## Features
 
